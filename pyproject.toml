@@ -1,0 +1,105 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "medaugment"
+version = "0.1.0"
+description = "Clinically-aware medical image augmentation for AI training (MRI, CT, X-Ray, Tomosynthesis)."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "MedAugment Contributors" },
+]
+keywords = [
+    "medical-imaging",
+    "data-augmentation",
+    "deep-learning",
+    "dicom",
+    "nifti",
+    "tomosynthesis",
+    "mri",
+    "ct",
+    "radiology-ai",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Image Processing",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "numpy>=1.22",
+    "scipy>=1.9",
+]
+
+[project.optional-dependencies]
+dicom = ["pydicom>=2.3"]
+nifti = ["nibabel>=4.0"]
+io = ["pydicom>=2.3", "nibabel>=4.0"]
+test = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "hypothesis>=6.70",
+    "pydicom>=2.3",
+    "nibabel>=4.0",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "hypothesis>=6.70",
+    "pydicom>=2.3",
+    "nibabel>=4.0",
+    "ruff>=0.4",
+    "mypy>=1.5",
+]
+
+[project.urls]
+Homepage = "https://github.com/medaugment/medaugment"
+Documentation = "https://github.com/medaugment/medaugment/tree/main/docs"
+Source = "https://github.com/medaugment/medaugment"
+Issues = "https://github.com/medaugment/medaugment/issues"
+
+[tool.setuptools.packages.find]
+include = ["medaugment*"]
+exclude = ["tests*", "examples*", "docs*"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+addopts = "-ra -q --strict-markers"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "io: marks tests that require optional I/O dependencies",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests gate optional-dependency imports behind pytest.importorskip,
+# which forces module-level imports to follow a statement.
+"tests/io/*.py" = ["E402"]
+
+[tool.mypy]
+python_version = "3.9"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
