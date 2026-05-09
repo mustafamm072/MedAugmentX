@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
+from typing import Any
 
 import numpy as np
 
@@ -55,6 +56,15 @@ class Compose(Transform):
     def __iter__(self):
         return iter(self.transforms)
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.__class__.__name__,
+            "params": {
+                "transforms": [t.to_dict() for t in self.transforms],
+                "p": self.p,
+            },
+        }
+
 
 class OneOf(Transform):
     """Pick exactly one child uniformly at random and apply it.
@@ -102,6 +112,16 @@ class OneOf(Transform):
         idx = int(self.rng.choice(len(self.transforms), p=self.weights))
         # Force the chosen child to run regardless of its own ``p``.
         return self.transforms[idx].apply(volume)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.__class__.__name__,
+            "params": {
+                "transforms": [t.to_dict() for t in self.transforms],
+                "weights": self.weights.tolist(),
+                "p": self.p,
+            },
+        }
 
 
 class SomeOf(Transform):
@@ -155,6 +175,18 @@ class SomeOf(Transform):
         for i in idxs:
             out = self.transforms[int(i)].apply(out)
         return out
+
+    def to_dict(self) -> dict[str, Any]:
+        lo, hi = self.n_range
+        n: Any = lo if lo == hi else list(self.n_range)
+        return {
+            "name": self.__class__.__name__,
+            "params": {
+                "transforms": [t.to_dict() for t in self.transforms],
+                "n": n,
+                "p": self.p,
+            },
+        }
 
 
 __all__ = ["Compose", "OneOf", "SomeOf"]

@@ -1,7 +1,7 @@
 """Contrast & gamma transforms."""
 from __future__ import annotations
 
-from typing import Union
+from typing import Any, Union
 
 import numpy as np
 
@@ -65,3 +65,15 @@ class GammaCorrection(Transform):
             powered = 1.0 - powered
         out = powered * (hi - lo) + lo
         return volume.replace(image=out.astype(np.float32, copy=False))
+
+    def to_dict(self) -> dict[str, Any]:
+        gr = self.gamma_range
+        gamma: Any = gr[0] if gr[0] == gr[1] else list(gr)
+        return {
+            "name": self.__class__.__name__,
+            "params": {
+                "gamma": gamma,
+                "invert": self.invert,
+                "p": self.p,
+            },
+        }

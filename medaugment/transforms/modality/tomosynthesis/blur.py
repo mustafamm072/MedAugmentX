@@ -1,7 +1,7 @@
 """LimitedAngleBlur — anisotropic Z-only blur for DBT volumes."""
 from __future__ import annotations
 
-from typing import Union
+from typing import Any, Union
 
 from scipy.ndimage import gaussian_filter1d
 
@@ -74,3 +74,16 @@ class LimitedAngleBlur(Transform):
         blurred = gaussian_filter1d(image, sigma=sigma, axis=0, mode="reflect")
         # Mask is intentionally left untouched — see class docstring.
         return volume.replace(image=blurred)
+
+    def to_dict(self) -> dict[str, Any]:
+        ar = self.arc_range
+        arc_degrees: Any = ar[0] if ar[0] == ar[1] else list(ar)
+        return {
+            "name": self.__class__.__name__,
+            "params": {
+                "arc_degrees": arc_degrees,
+                "base_sigma": self.base_sigma,
+                "reference_arc_deg": self.reference_arc_deg,
+                "p": self.p,
+            },
+        }

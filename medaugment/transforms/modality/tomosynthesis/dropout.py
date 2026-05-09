@@ -1,7 +1,7 @@
 """SliceDropout — randomly zero a small number of slices."""
 from __future__ import annotations
 
-from typing import Union
+from typing import Any, Union
 
 from medaugment.core.base import Transform
 from medaugment.core.utils import SeedLike
@@ -67,3 +67,16 @@ class SliceDropout(Transform):
             new_mask = volume.mask.copy()
             new_mask[idxs] = 0
         return volume.replace(image=new_image, mask=new_mask)
+
+    def to_dict(self) -> dict[str, Any]:
+        nr = self.num_range
+        num_slices: Any = nr[0] if nr[0] == nr[1] else list(nr)
+        return {
+            "name": self.__class__.__name__,
+            "params": {
+                "num_slices": num_slices,
+                "cval": self.cval,
+                "affect_mask": self.affect_mask,
+                "p": self.p,
+            },
+        }

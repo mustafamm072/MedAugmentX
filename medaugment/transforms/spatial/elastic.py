@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Union
+from typing import Any, Union
 
 import numpy as np
 from scipy.ndimage import gaussian_filter, map_coordinates
@@ -108,3 +108,26 @@ class ElasticDeform(Transform):
             ).reshape(shape).astype(volume.mask.dtype, copy=False)
             new_mask = warped_mask
         return volume.replace(image=warped, mask=new_mask)
+
+    def to_dict(self) -> dict[str, Any]:
+        alpha = (
+            list(self.alpha_spec)
+            if isinstance(self.alpha_spec, (list, tuple))
+            else self.alpha_spec
+        )
+        sigma = (
+            list(self.sigma_spec)
+            if isinstance(self.sigma_spec, (list, tuple))
+            else self.sigma_spec
+        )
+        return {
+            "name": self.__class__.__name__,
+            "params": {
+                "alpha": alpha,
+                "sigma": sigma,
+                "order": self.order,
+                "mode": self.mode,
+                "cval": self.cval,
+                "p": self.p,
+            },
+        }

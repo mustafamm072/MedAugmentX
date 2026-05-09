@@ -1,7 +1,7 @@
 """Noise models: additive Gaussian and MRI-style Rician."""
 from __future__ import annotations
 
-from typing import Union
+from typing import Any, Union
 
 import numpy as np
 
@@ -64,6 +64,19 @@ class GaussianNoise(Transform):
             out = np.clip(out, self.clip[0], self.clip[1])
         return volume.replace(image=out)
 
+    def to_dict(self) -> dict[str, Any]:
+        sr = self.std_range
+        std: Any = sr[0] if sr[0] == sr[1] else list(sr)
+        return {
+            "name": self.__class__.__name__,
+            "params": {
+                "std": std,
+                "relative": self.relative,
+                "clip": list(self.clip) if self.clip is not None else None,
+                "p": self.p,
+            },
+        }
+
 
 class RicianNoise(Transform):
     """Rician noise — the noise model for magnitude MRI.
@@ -103,3 +116,15 @@ class RicianNoise(Transform):
         if self.clip is not None:
             out = np.clip(out, self.clip[0], self.clip[1])
         return volume.replace(image=out)
+
+    def to_dict(self) -> dict[str, Any]:
+        sr = self.std_range
+        std: Any = sr[0] if sr[0] == sr[1] else list(sr)
+        return {
+            "name": self.__class__.__name__,
+            "params": {
+                "std": std,
+                "clip": list(self.clip) if self.clip is not None else None,
+                "p": self.p,
+            },
+        }

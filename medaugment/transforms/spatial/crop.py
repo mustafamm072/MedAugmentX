@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 
@@ -98,3 +99,14 @@ class AnatomicCrop(Transform):
         new_image = volume.image[slices].copy()
         new_mask = None if volume.mask is None else volume.mask[slices].copy()
         return volume.replace(image=new_image, mask=new_mask)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.__class__.__name__,
+            "params": {
+                "size": list(self.size),
+                "foreground_prob": self.foreground_prob,
+                "foreground_threshold": self.foreground_threshold,
+                "p": self.p,
+            },
+        }

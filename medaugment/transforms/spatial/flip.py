@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
-from typing import Union
+from typing import Any, Union
 
 import numpy as np
 
@@ -63,3 +63,13 @@ class RandomFlip(Transform):
         new_image = np.flip(volume.image, axis=flips).copy()
         new_mask = None if volume.mask is None else np.flip(volume.mask, axis=flips).copy()
         return volume.replace(image=new_image, mask=new_mask)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.__class__.__name__,
+            "params": {
+                "axes": list(self.axes_spec),
+                "p_per_axis": self.p_per_axis,
+                "p": self.p,
+            },
+        }

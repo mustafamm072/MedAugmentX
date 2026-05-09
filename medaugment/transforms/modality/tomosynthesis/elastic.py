@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 
 from medaugment.core.base import Transform
 from medaugment.core.utils import SeedLike
@@ -56,3 +57,14 @@ class AnisotropicElastic(Transform):
         if not volume.is_3d:
             raise ValueError("AnisotropicElastic requires a 3D volume")
         return self._inner.apply(volume)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.__class__.__name__,
+            "params": {
+                "alpha": list(self._inner.alpha_spec),
+                "sigma": list(self._inner.sigma_spec),
+                "order": self._inner.order,
+                "p": self.p,
+            },
+        }

@@ -1,7 +1,7 @@
 """Random affine transform (rotation + scaling + translation), 2D and 3D."""
 from __future__ import annotations
 
-from typing import Union
+from typing import Any, Union
 
 import numpy as np
 from scipy.ndimage import affine_transform
@@ -170,3 +170,18 @@ class RandomAffine(Transform):
                 prefilter=False,
             ).astype(volume.mask.dtype, copy=False)
         return volume.replace(image=new_image, mask=new_mask)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.__class__.__name__,
+            "params": {
+                "rotation": list(self.rotation_range),
+                "scale": list(self.scale_range),
+                "translation": list(self.translation_range),
+                "axes_enabled": list(self.axes_enabled),
+                "order": self.order,
+                "mode": self.mode,
+                "cval": self.cval,
+                "p": self.p,
+            },
+        }

@@ -1,7 +1,7 @@
 """SlabShift — Z-axis recon-centre variation for DBT volumes."""
 from __future__ import annotations
 
-from typing import Union
+from typing import Any, Union
 
 import numpy as np
 
@@ -75,3 +75,15 @@ class SlabShift(Transform):
             else self._shift_array(volume.mask, shift, 0).astype(volume.mask.dtype, copy=False)
         )
         return volume.replace(image=new_image, mask=new_mask)
+
+    def to_dict(self) -> dict[str, Any]:
+        sr = self.shift_range
+        max_shift: Any = sr[1] if sr[0] == -sr[1] else list(sr)
+        return {
+            "name": self.__class__.__name__,
+            "params": {
+                "max_shift": max_shift,
+                "cval": self.cval,
+                "p": self.p,
+            },
+        }
