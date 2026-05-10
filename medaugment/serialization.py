@@ -114,7 +114,7 @@ _register_builtins()
 # ---------------------------------------------------------------------------
 
 
-def from_dict(d: dict[str, Any]) -> "Transform":
+def from_dict(d: dict[str, Any]) -> Transform:
     """Reconstruct a :class:`~medaugment.core.base.Transform` from its dict form.
 
     The dict must have the structure produced by :meth:`Transform.to_dict`::
@@ -174,7 +174,7 @@ def _make_serialisable(obj: Any) -> Any:
     return obj
 
 
-def to_json(transform: "Transform", indent: int = 2) -> str:
+def to_json(transform: Transform, indent: int = 2) -> str:
     """Serialise a transform (or pipeline) to a JSON string.
 
     Args:
@@ -189,7 +189,7 @@ def to_json(transform: "Transform", indent: int = 2) -> str:
     return json.dumps(_make_serialisable(transform.to_dict()), indent=indent)
 
 
-def from_json(s: str) -> "Transform":
+def from_json(s: str) -> Transform:
     """Reconstruct a transform from a JSON string produced by :func:`to_json`.
 
     Args:
@@ -206,7 +206,7 @@ def from_json(s: str) -> "Transform":
 # ---------------------------------------------------------------------------
 
 
-def to_yaml(transform: "Transform") -> str:
+def to_yaml(transform: Transform) -> str:
     """Serialise a transform to a YAML string.
 
     Requires ``pip install pyyaml``.
@@ -234,7 +234,7 @@ def to_yaml(transform: "Transform") -> str:
     )
 
 
-def from_yaml(s: str) -> "Transform":
+def from_yaml(s: str) -> Transform:
     """Reconstruct a transform from a YAML string produced by :func:`to_yaml`.
 
     Requires ``pip install pyyaml``.

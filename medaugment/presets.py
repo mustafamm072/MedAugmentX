@@ -15,7 +15,7 @@ All pipelines are serialisable via :mod:`medaugment.serialization`.
 """
 from __future__ import annotations
 
-from medaugment.core.compose import Compose, OneOf, SomeOf
+from medaugment.core.compose import Compose, OneOf
 from medaugment.core.utils import SeedLike
 
 # ---------------------------------------------------------------------------
