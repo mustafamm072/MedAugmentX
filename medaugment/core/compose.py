@@ -62,6 +62,7 @@ class Compose(Transform):
             "params": {
                 "transforms": [t.to_dict() for t in self.transforms],
                 "p": self.p,
+                "seed": self._seed,
             },
         }
 
@@ -120,6 +121,7 @@ class OneOf(Transform):
                 "transforms": [t.to_dict() for t in self.transforms],
                 "weights": self.weights.tolist(),
                 "p": self.p,
+                "seed": self._seed,
             },
         }
 
@@ -185,6 +187,7 @@ class SomeOf(Transform):
                 "transforms": [t.to_dict() for t in self.transforms],
                 "n": n,
                 "p": self.p,
+                "seed": self._seed,
             },
         }
 

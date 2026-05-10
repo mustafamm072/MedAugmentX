@@ -6,10 +6,14 @@ Run with:
 """
 from __future__ import annotations
 
+import json
+
 import numpy as np
 
 from medaugment import Compose, MedVolume, OneOf
+from medaugment.serialization import from_json, to_json
 from medaugment.transforms import (
+    BiasField,
     ElasticDeform,
     GammaCorrection,
     GaussianNoise,
@@ -29,9 +33,13 @@ def main() -> None:
 
     pipeline = Compose([
         RandomFlip(axes=("x",), p_per_axis=0.5),
-        RandomAffine(rotation=15.0, scale=(0.95, 1.05), p=0.7),
-        ElasticDeform(alpha=(60.0, 60.0, 5.0), sigma=(6.0, 6.0, 2.0), p=0.5),
-        OneOf([RicianNoise(std=0.02), GaussianNoise(std=0.015)], p=0.6),
+        RandomAffine(rotation=10.0, scale=(0.9, 1.1), translation=(-0.05, 0.05), p=0.7),
+        ElasticDeform(alpha=30.0, sigma=4.0, p=0.5),
+        BiasField(alpha=0.3, p=0.7),
+        OneOf([
+            RicianNoise(std=(0.005, 0.02)),
+            GaussianNoise(std=0.015),
+        ], p=0.6),
         GammaCorrection(gamma=(0.85, 1.15), p=0.5),
     ], seed=42)
 
@@ -39,8 +47,19 @@ def main() -> None:
 
     print("Input :", vol)
     print("Output:", out)
-    print("Pipeline shape preserved:", out.image.shape == vol.image.shape)
-    print("Mask labels preserved   :", set(np.unique(out.mask).tolist()))
+    print("Shape preserved:", out.image.shape == vol.image.shape)
+    print("Mask labels    :", set(np.unique(out.mask).tolist()))
+
+    # --- Serialisation round-trip ---
+    json_str = to_json(pipeline)
+    pipeline2 = from_json(json_str)
+    out2 = pipeline2(vol)
+    print("\nPipeline JSON (first 120 chars):", json_str[:120], "...")
+    print("Round-trip identical:", np.array_equal(out.image, out2.image))
+
+    # Pretty-print the pipeline dict
+    print("\nPipeline structure:")
+    print(json.dumps(pipeline.to_dict(), indent=2, default=str)[:400], "...")
 
 
 if __name__ == "__main__":

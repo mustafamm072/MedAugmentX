@@ -19,13 +19,20 @@ and `mypy`.
 ## Repository layout
 
 ```
-medaugment/         # Library source
-  core/             # MedVolume, Transform base, Compose/OneOf/SomeOf
-  transforms/       # Spatial, intensity, modality-specific transforms
-  io/               # DICOM, NIfTI loaders
-tests/              # Mirrors the source layout
-docs/               # Architecture, milestones, API examples
-examples/           # Runnable scripts
+medaugment/                 # Library source
+  core/                     # MedVolume, Transform base, Compose/OneOf/SomeOf
+  transforms/               # Spatial, intensity, modality-specific transforms
+    spatial/                # RandomAffine, RandomFlip, ElasticDeform, AnatomicCrop
+    intensity/              # GaussianNoise, BiasField, WindowLevel, …
+    modality/mri/           # GhostingArtifact, KSpaceDropout
+    modality/ct/            # BeamHardening
+    modality/tomosynthesis/ # SlabShift, LimitedAngleBlur, SliceDropout, …
+  io/                       # DICOM, NIfTI loaders (optional dependency)
+  presets.py                # mri_pipeline, ct_pipeline, dxr_pipeline, dbt_pipeline
+  serialization.py          # to_json / from_json / to_yaml / from_yaml / REGISTRY
+tests/                      # Mirrors the source layout
+docs/                       # Architecture, milestones, API examples
+examples/                   # Runnable scripts
 ```
 
 ## Coding conventions
@@ -47,6 +54,8 @@ examples/           # Runnable scripts
 Use this template:
 
 ```python
+from __future__ import annotations
+from typing import Any
 from medaugment.core import Transform, MedVolume
 
 class MyTransform(Transform):
@@ -67,17 +76,37 @@ class MyTransform(Transform):
         # If the transform is spatial, also transform volume.mask with
         # nearest-neighbour interpolation using the *same* sampled params.
         return volume.replace(image=new_image)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.__class__.__name__,
+            "params": {"strength": self.strength, "p": self.p},
+        }
 ```
+
+`to_dict()` is required for JSON/YAML serialisation. The `"params"` values
+must be valid `__init__` keyword arguments so `from_dict()` can reconstruct
+the transform. Register the class in `REGISTRY` if users will serialise
+pipelines that include it:
+
+```python
+from medaugment.serialization import REGISTRY
+REGISTRY["MyTransform"] = MyTransform
+```
+
+Built-in transforms are registered automatically in `serialization.py`.
 
 Then:
 
 1. Add the class to the appropriate `medaugment/transforms/<group>/` module.
 2. Re-export it from `medaugment/transforms/__init__.py`.
-3. Add tests in `tests/transforms/<group>/test_<name>.py` covering:
+3. Register it in `REGISTRY` inside `medaugment/serialization.py` (`_register_builtins`).
+4. Add tests in `tests/transforms/<group>/test_<name>.py` covering:
    - output shape and dtype,
    - mask/image consistency (if spatial),
    - reproducibility under a fixed seed,
-   - the `p=0` and `p=1` boundary behaviour.
+   - the `p=0` and `p=1` boundary behaviour,
+   - JSON round-trip via `to_dict()` / `from_dict()`.
 
 ## Tests
 
@@ -99,8 +128,8 @@ Short imperative subject (≤ 72 chars). Body explains *why*, not what.
 ```
 Add SlabShift transform for DBT pipelines
 
-Phase 1 deliverable. Shift simulates Z-axis recon-centre variation
-between scans on the same patient — important for cross-study models.
+Simulates Z-axis reconstruction-centre variation between scans on the
+same patient — important for cross-study robustness.
 ```
 
 ## Pull requests

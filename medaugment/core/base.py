@@ -37,6 +37,8 @@ class Transform(ABC):
         if not 0.0 <= float(p) <= 1.0:
             raise ValueError(f"p must be in [0, 1], got {p}")
         self.p: float = float(p)
+        # Store the seed for serialisation (int or None only; Generator can't round-trip).
+        self._seed: int | None = seed if isinstance(seed, (int, type(None))) else None
         self.rng: np.random.Generator = resolve_rng(seed)
 
     def __call__(self, volume: MedVolume) -> MedVolume:

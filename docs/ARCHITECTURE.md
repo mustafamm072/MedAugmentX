@@ -5,36 +5,46 @@ upward dependencies, and a flat public surface. This document explains the
 layout and the rules each layer follows.
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│ User pipeline (Compose, OneOf, SomeOf)                     │
-├────────────────────────────────────────────────────────────┤
-│ Transforms                                                 │
-│   spatial/   intensity/   modality/tomosynthesis/          │
-├────────────────────────────────────────────────────────────┤
-│ Core                                                       │
-│   MedVolume · Transform ABC · seedable RNG · helpers       │
-├────────────────────────────────────────────────────────────┤
-│ I/O                                                        │
-│   DICOM series · NIfTI                                     │
-└────────────────────────────────────────────────────────────┘
-              numpy + scipy (always)
-              pydicom + nibabel (optional, behind extras)
+┌─────────────────────────────────────────────────────────────────┐
+│ Presets  (medaugment/presets.py)                                │
+│   mri_pipeline · ct_pipeline · dxr_pipeline · dbt_pipeline     │
+├─────────────────────────────────────────────────────────────────┤
+│ Serialisation  (medaugment/serialization.py)                    │
+│   REGISTRY · from_dict · to_json / from_json · to_yaml / from_yaml │
+├─────────────────────────────────────────────────────────────────┤
+│ User pipeline  (Compose · OneOf · SomeOf)                       │
+├─────────────────────────────────────────────────────────────────┤
+│ Transforms                                                      │
+│   spatial/   intensity/   modality/mri/   modality/ct/          │
+│                           modality/tomosynthesis/               │
+├─────────────────────────────────────────────────────────────────┤
+│ Core                                                            │
+│   MedVolume · Transform ABC · seedable RNG · helpers            │
+├─────────────────────────────────────────────────────────────────┤
+│ I/O  (optional)                                                 │
+│   DICOM series · NIfTI                                          │
+└─────────────────────────────────────────────────────────────────┘
+            numpy + scipy (always present)
+            pydicom + nibabel (optional, behind extras)
+            pyyaml (optional, behind [yaml] extra)
 ```
+
+---
 
 ## 1. Core layer (`medaugment/core/`)
 
-The foundational types. **Nothing else in the library is allowed without it,
-and it has no dependencies of its own beyond NumPy.**
+The foundational types. **Nothing else in the library may import upward into
+user code, and core has no dependencies beyond NumPy.**
 
 ### `MedVolume` (`core/volume.py`)
 
 ```python
 @dataclass
 class MedVolume:
-    image: np.ndarray                 # (D, H, W) or (H, W), recommended float32
-    mask: Optional[np.ndarray]        # same shape as image, integer labels
-    spacing: Tuple[float, ...]        # mm per axis, one entry per ndim
-    metadata: Dict[str, Any]          # modality, vendor, original tags...
+    image: np.ndarray                # (D, H, W) or (H, W), recommended float32
+    mask: Optional[np.ndarray]       # same shape as image, integer labels
+    spacing: Tuple[float, ...]       # mm per axis, one entry per ndim
+    metadata: Dict[str, Any]         # modality, vendor, original tags...
 ```
 
 Invariants enforced in `__post_init__`:
@@ -44,7 +54,7 @@ Invariants enforced in `__post_init__`:
 - spacing length matches image ndim (defaults to all-1.0 if omitted),
 - metadata is a dict.
 
-`replace()` returns a shallow-copy with selected fields swapped. `copy()`
+`replace()` returns a shallow copy with selected fields swapped. `copy()`
 deep-copies the arrays.
 
 ### Axis convention
@@ -55,7 +65,7 @@ deep-copies the arrays.
 | 2D | `(H, W)` | y (row) | x (col) | — |
 
 `spacing` follows the same order. The DICOM and NIfTI loaders both transpose
-to this convention so that downstream code never has to think about it.
+to this convention so downstream code never has to think about it.
 
 ### `Transform` (`core/base.py`)
 
@@ -64,36 +74,43 @@ base class handles:
 
 - probability gating (`p` in `[0, 1]`),
 - the `self.rng` generator (always used in transforms, never `np.random`),
-- a `to_dict()` introspection helper (full YAML serialisation lands in Phase 2).
+- `to_dict()` — returns a dict suitable for reconstruction via
+  `medaugment.serialization.from_dict()`.
 
 ### `Compose`, `OneOf`, `SomeOf` (`core/compose.py`)
 
 - **`Compose`** runs children sequentially. The top-level seed is *spawned*
   into one independent generator per child via `derive_rng`, so a given seed
   produces bit-identical output every time. Adding or removing transforms
-  does not change the seed assignments of the unchanged ones.
+  does not change the seed assignments of the unchanged children.
 - **`OneOf`** picks exactly one child, optionally weighted, and forces it to
   run regardless of the child's own `p`.
 - **`SomeOf`** picks `n` (or a range) children without replacement and
   applies them in deterministic order.
+
+All three containers override `to_dict()` to serialise their children
+recursively, enabling lossless round-trip serialisation of entire pipelines.
 
 ### Seeding rules
 
 1. Every transform owns a `np.random.Generator` (`self.rng`).
 2. `Compose` derives child seeds from its own seed; passing a seed to the
    top level is sufficient for end-to-end reproducibility.
-3. **Transforms must never call `np.random` directly.** Use `self.rng`. CI
-   does not (yet) lint for this; reviewers should.
+3. **Transforms must never call `np.random` directly.** Use `self.rng`.
+
+---
 
 ## 2. Transforms layer (`medaugment/transforms/`)
 
 Subdivided by *what* changes about the image:
 
-| Folder | Changes | Phase 1 contents |
+| Folder | Changes | Contents |
 | --- | --- | --- |
 | `spatial/` | Geometry — pixels move | `RandomAffine`, `RandomFlip`, `AnatomicCrop`, `ElasticDeform` |
-| `intensity/` | Per-pixel value, geometry preserved | `GaussianNoise`, `RicianNoise`, `GammaCorrection` |
-| `modality/<modality>/` | Anything that only makes sense for one modality | `tomosynthesis/`: `SlabShift`, `LimitedAngleBlur`, `SliceDropout`, `AnisotropicElastic` |
+| `intensity/` | Per-pixel value, geometry preserved | `GaussianNoise`, `RicianNoise`, `GammaCorrection`, `BiasField`, `WindowLevel`, `BrightnessContrast`, `GaussianBlur`, `SimulateLowResolution` |
+| `modality/mri/` | MRI-specific artifacts | `GhostingArtifact`, `KSpaceDropout` |
+| `modality/ct/` | CT-specific artifacts | `BeamHardening` |
+| `modality/tomosynthesis/` | DBT-specific | `SlabShift`, `LimitedAngleBlur`, `SliceDropout`, `AnisotropicElastic` |
 
 ### Mask consistency contract
 
@@ -104,81 +121,128 @@ Every spatial transform must:
 2. Use **nearest-neighbour interpolation** (`order=0`) for the mask.
 3. Preserve the mask's dtype.
 
+Intensity and modality transforms must not modify the mask at all (with the
+one opt-in exception of `SliceDropout(affect_mask=True)`).
+
 This is what makes `Compose([RandomAffine(...), ElasticDeform(...)])` safe
-to use for segmentation training. There is a regression test covering 100
-random seeds in `tests/integration/test_full_pipeline.py`.
+to use for segmentation training. A 100-seed regression test covering
+image/mask alignment lives in `tests/integration/test_full_pipeline.py`.
 
 ### Anisotropic awareness
 
-Phase 1 builds the primitives that Phase 2 will compose into modality
-presets. The most important is anisotropic-aware sigma/alpha for elastic
-deformation: a DBT volume with `(1.0, 0.1, 0.1) mm` spacing must not be
-warped along Z as much as in-plane, so `ElasticDeform(alpha=(120, 120, 10),
-sigma=(10, 10, 3))` is the canonical setup. `AnisotropicElastic` is a thin
-wrapper with DBT defaults that fails fast on 2D input.
+DBT volumes typically have `(1.0, 0.1, 0.1) mm` spacing — ten times more
+compressed along Z than in-plane. Elastic deformation, bias fields, and
+limited-angle blur are all anisotropy-aware:
 
-## 3. I/O layer (`medaugment/io/`)
+- `ElasticDeform(alpha=(120, 120, 10), sigma=(10, 10, 3))` — per-axis magnitude
+- `AnisotropicElastic` — thin wrapper with DBT defaults that fails fast on 2D input
+- `LimitedAngleBlur` — applies blur only along Z, scaled by acquisition arc angle
+- `BiasField(coarse_shape=4)` — independent coarse grid per axis, upsampled uniformly
 
-Loaders are **optional dependencies**. The top-level imports do not require
+### Serialisation contract
+
+Every transform must override `to_dict()` to return a dict whose `"params"`
+can be passed as keyword arguments to `__init__()` to reconstruct it. New
+transforms should design their stored attributes to match their `__init__`
+parameter names, or explicitly map them in `to_dict()`.
+
+---
+
+## 3. Serialisation (`medaugment/serialization.py`)
+
+Enables lossless round-trip persistence of any pipeline.
+
+```
+pipeline  ──to_json()──►  JSON string  ──from_json()──►  pipeline
+pipeline  ──to_yaml()──►  YAML string  ──from_yaml()──►  pipeline  (requires PyYAML)
+```
+
+**`REGISTRY`** maps class names to classes. All 22 built-in transforms are
+registered at import time. Custom transforms can be added:
+
+```python
+from medaugment.serialization import REGISTRY
+REGISTRY["MyTransform"] = MyTransform
+```
+
+**`from_dict(d)`** reconstructs any transform from its dict form.
+Containers (`Compose`, `OneOf`, `SomeOf`) are handled recursively — the
+`"transforms"` list in `params` is reconstructed before the container itself.
+
+JSON serialisation uses only the Python standard library. YAML is optional
+(`pip install pyyaml`) and exposed via `to_yaml` / `from_yaml`.
+
+---
+
+## 4. Presets (`medaugment/presets.py`)
+
+Four factory functions return fully-configured, seeded `Compose` pipelines:
+
+| Function | Modality | Key transforms |
+| --- | --- | --- |
+| `mri_pipeline(seed)` | MRI | affine, elastic, bias field, Rician noise, ghosting or k-space dropout |
+| `ct_pipeline(seed)` | CT | affine, elastic, window/level, Gaussian noise, beam hardening |
+| `dxr_pipeline(seed)` | Digital X-ray | affine, blur, brightness/contrast, gamma, low-resolution sim |
+| `dbt_pipeline(seed)` | DBT | affine, anisotropic elastic, slab shift, limited-angle blur, slice dropout, bias field |
+
+All presets are serialisable via `to_json` / `to_yaml`.
+
+---
+
+## 5. I/O layer (`medaugment/io/`)
+
+Loaders are **optional dependencies**. Top-level imports do not require
 `pydicom` or `nibabel`; the helpers raise a clear `ImportError` only when
 called without their backend installed.
 
 | Helper | Backend | Returns |
 | --- | --- | --- |
-| `load_dicom_series(path)` | `pydicom` | `MedVolume` (3D from a series, 2D from a single file) |
+| `load_dicom_series(path)` | `pydicom` | `MedVolume` (3D from series, 2D from single file) |
 | `load_nifti(path)` | `nibabel` | `MedVolume` |
 | `save_nifti(vol, path)` | `nibabel` | None |
 
-DICOM loading sorts slices by image position projected onto the slice
-normal, applies `RescaleSlope * pixels + RescaleIntercept`, and reads
-spacing from `PixelSpacing` plus the median inter-slice distance. Vendor
-metadata (`Manufacturer`, `SeriesInstanceUID`, etc.) is preserved.
+DICOM loading sorts slices by image position projected onto the slice normal,
+applies `RescaleSlope * pixels + RescaleIntercept`, and reads spacing from
+`PixelSpacing` plus the median inter-slice distance. Vendor metadata
+(`Manufacturer`, `SeriesInstanceUID`, etc.) is preserved in `metadata`.
 
-Phase 2 adds vendor-specific multi-frame DBT parsers (Hologic Selenia
-Dimensions, GE SenoClaire, Siemens MAMMOMAT Revelation).
+---
 
-## 4. Tomosynthesis as a first-class modality
-
-DBT is the third major axis of design (alongside MRI and CT) because no
-existing library supports it natively. Phase 1 ships the four most-needed
-DBT transforms:
-
-| Transform | Effect |
-| --- | --- |
-| `SlabShift` | Z-axis recon-centre variation (typical: ±2 slices) |
-| `LimitedAngleBlur` | Z-only Gaussian blur scaled by acquisition arc |
-| `SliceDropout` | Zero a small number of slices (robustness) |
-| `AnisotropicElastic` | DBT-default `alpha=(100,100,8)`, `sigma=(8,8,2)` |
-
-A full `TOMOSYNTHESIS_STANDARD` preset, vendor parsers, and the
-remaining DBT transforms (`CompressionVariation`, `ReconStreak`) arrive in
-Phase 2.
-
-## 5. Dependencies
+## 6. Dependencies
 
 | Layer | Required | Optional |
 | --- | --- | --- |
 | Core | `numpy` | — |
-| Transforms | `scipy.ndimage` | — |
+| Transforms | `scipy` | — |
+| Serialisation | — | `pyyaml` (YAML only; JSON uses stdlib) |
 | I/O | — | `pydicom`, `nibabel` |
 
 Phase 3 adds an optional PyTorch backend for GPU-accelerated spatial
 transforms; it stays behind an extra so installing MedAugment never pulls
 in a deep-learning framework by default.
 
-## 6. Testing strategy
+---
+
+## 7. Testing strategy
 
 - **Unit tests** for every transform — output shape, dtype, value range,
-  reproducibility under a fixed seed, `p=0` boundary.
-- **Mask consistency** tests for spatial transforms.
-- **Integration tests** under `tests/integration/` exercise the full
-  pipeline end-to-end and include a 100-seed regression test for image/mask
-  alignment.
+  reproducibility under a fixed seed, `p=0` boundary, mask untouched.
+- **Mask consistency** regression tests for spatial transforms.
+- **Integration tests** under `tests/integration/` exercise the full pipeline
+  end-to-end with a 100-seed regression for image/mask alignment.
+- **Serialisation tests** verify JSON round-trip for all 22 registered
+  transforms and all three container types.
+- **Preset tests** verify that each preset runs on the correct volume
+  dimensionality, produces bit-identical output under the same seed, and
+  round-trips through serialisation.
 - **I/O tests** are marked `@pytest.mark.io` and skipped automatically when
   the optional dependency is missing.
 
-## 7. Public surface
+---
 
-The flat re-export in `medaugment/__init__.py` is the only thing users are
-expected to import from. Internal modules may move between minor versions;
-the public surface follows SemVer once we hit `1.0`.
+## 8. Public surface
+
+The flat re-export in `medaugment/transforms/__init__.py` is the canonical
+import path. Internal modules (`medaugment/transforms/intensity/bias_field.py`,
+etc.) may move between minor versions; the public surface follows SemVer once
+we hit `1.0`.
