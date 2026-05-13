@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from medaugment import Compose, MedVolume, OneOf
-from medaugment.transforms import (
+from medaugmentx import Compose, MedVolume, OneOf
+from medaugmentx.transforms import (
     AnisotropicElastic,
     ElasticDeform,
     GammaCorrection,

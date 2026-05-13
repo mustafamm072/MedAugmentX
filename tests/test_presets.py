@@ -2,9 +2,9 @@
 import numpy as np
 import pytest
 
-from medaugment import Compose, MedVolume
-from medaugment.presets import ct_pipeline, dbt_pipeline, dxr_pipeline, mri_pipeline
-from medaugment.serialization import from_json, to_json
+from medaugmentx import Compose, MedVolume
+from medaugmentx.presets import ct_pipeline, dbt_pipeline, dxr_pipeline, mri_pipeline
+from medaugmentx.serialization import from_json, to_json
 
 
 @pytest.fixture

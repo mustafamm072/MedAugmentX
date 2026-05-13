@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from medaugment.core import MedVolume
-from medaugment.transforms import AnatomicCrop
+from medaugmentx.core import MedVolume
+from medaugmentx.transforms import AnatomicCrop
 
 
 def test_crop_returns_correct_shape():

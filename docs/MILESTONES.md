@@ -14,15 +14,15 @@ DICOM/NIfTI I/O. Enough for early adopters and internal testing.
 
 | # | Deliverable | Module | Status |
 | --- | --- | --- | --- |
-| 1.1 | `MedVolume` dataclass + `Transform` ABC | `medaugment/core/{volume,base}.py` | ✅ |
-| 1.2 | `Compose`, `OneOf`, `SomeOf` | `medaugment/core/compose.py` | ✅ |
-| 1.3 | `RandomAffine`, `RandomFlip`, `AnatomicCrop` | `medaugment/transforms/spatial/` | ✅ |
-| 1.4 | `ElasticDeform` with anisotropic sigma | `medaugment/transforms/spatial/elastic.py` | ✅ |
-| 1.5 | `RicianNoise`, `GaussianNoise`, `GammaCorrection` | `medaugment/transforms/intensity/` | ✅ |
-| 1.6 | DICOM loader with spacing metadata | `medaugment/io/dicom.py` | ✅ |
-| 1.7 | NIfTI loader/writer | `medaugment/io/nifti.py` | ✅ |
-| 1.8 | `SlabShift` + `LimitedAngleBlur` (DBT) | `medaugment/transforms/modality/tomosynthesis/` | ✅ |
-| 1.9 | `SliceDropout`, `AnisotropicElastic` (DBT) | `medaugment/transforms/modality/tomosynthesis/` | ✅ |
+| 1.1 | `MedVolume` dataclass + `Transform` ABC | `medaugmentx/core/{volume,base}.py` | ✅ |
+| 1.2 | `Compose`, `OneOf`, `SomeOf` | `medaugmentx/core/compose.py` | ✅ |
+| 1.3 | `RandomAffine`, `RandomFlip`, `AnatomicCrop` | `medaugmentx/transforms/spatial/` | ✅ |
+| 1.4 | `ElasticDeform` with anisotropic sigma | `medaugmentx/transforms/spatial/elastic.py` | ✅ |
+| 1.5 | `RicianNoise`, `GaussianNoise`, `GammaCorrection` | `medaugmentx/transforms/intensity/` | ✅ |
+| 1.6 | DICOM loader with spacing metadata | `medaugmentx/io/dicom.py` | ✅ |
+| 1.7 | NIfTI loader/writer | `medaugmentx/io/nifti.py` | ✅ |
+| 1.8 | `SlabShift` + `LimitedAngleBlur` (DBT) | `medaugmentx/transforms/modality/tomosynthesis/` | ✅ |
+| 1.9 | `SliceDropout`, `AnisotropicElastic` (DBT) | `medaugmentx/transforms/modality/tomosynthesis/` | ✅ |
 | 1.10 | Unit + integration test suite (pytest, 92 tests) | `tests/` | ✅ |
 | 1.11 | PyPI packaging + README docs | `pyproject.toml`, `README.md` | ✅ |
 
@@ -43,10 +43,10 @@ serialisation layer, and pre-built preset pipelines.
 | 2.4 | `GhostingArtifact`, `KSpaceDropout` (MRI) | `transforms/modality/mri/` | ✅ |
 | 2.5 | `BeamHardening` (CT cupping artifact) | `transforms/modality/ct/` | ✅ |
 | 2.6 | `to_dict()` round-trip overrides on all transforms | all transform modules | ✅ |
-| 2.7 | `Compose`/`OneOf`/`SomeOf` recursive `to_dict()` | `medaugment/core/compose.py` | ✅ |
-| 2.8 | JSON serialisation: `to_json`, `from_json`, `REGISTRY` | `medaugment/serialization.py` | ✅ |
-| 2.9 | Optional YAML serialisation: `to_yaml`, `from_yaml` | `medaugment/serialization.py` | ✅ |
-| 2.10 | Preset pipelines: `mri_pipeline`, `ct_pipeline`, `dxr_pipeline`, `dbt_pipeline` | `medaugment/presets.py` | ✅ |
+| 2.7 | `Compose`/`OneOf`/`SomeOf` recursive `to_dict()` | `medaugmentx/core/compose.py` | ✅ |
+| 2.8 | JSON serialisation: `to_json`, `from_json`, `REGISTRY` | `medaugmentx/serialization.py` | ✅ |
+| 2.9 | Optional YAML serialisation: `to_yaml`, `from_yaml` | `medaugmentx/serialization.py` | ✅ |
+| 2.10 | Preset pipelines: `mri_pipeline`, `ct_pipeline`, `dxr_pipeline`, `dbt_pipeline` | `medaugmentx/presets.py` | ✅ |
 | 2.11 | Extended test suite (216 tests total) | `tests/` | ✅ |
 
 ### Remaining Phase 2 work (deferred to Phase 3)

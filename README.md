@@ -1,4 +1,4 @@
-# MedAugment
+# MedAugmentX
 
 **Clinically-aware medical image augmentation for AI training.**
 
@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Status: Phase 2](https://img.shields.io/badge/status-phase%202-green.svg)](docs/MILESTONES.md)
 
-MedAugment is a purpose-built Python library for data augmentation of medical
+MedAugmentX is a purpose-built Python library for data augmentation of medical
 images. Unlike general-purpose libraries (`torchvision`, `albumentations`), it
 treats the unique properties of medical data — anisotropic 3D volumes,
 modality-specific artifacts, mask consistency, and clinical I/O — as
@@ -17,9 +17,9 @@ SciPy. PyTorch, MONAI, and TorchIO interop are planned for Phase 3.
 
 ---
 
-## Why MedAugment
+## Why MedAugmentX
 
-| Problem with general-purpose augmentation | What MedAugment does |
+| Problem with general-purpose augmentation | What MedAugmentX does |
 | --- | --- |
 | Treats every image as 2D RGB | Native 3D volumes with anisotropic-aware ops |
 | No MRI-specific noise or artifact models | Physics-based Rician noise, bias field, k-space corruption, ghosting |
@@ -35,20 +35,20 @@ SciPy. PyTorch, MONAI, and TorchIO interop are planned for Phase 3.
 
 ```bash
 # Core (NumPy + SciPy only)
-pip install medaugment
+pip install medaugmentx
 
 # With DICOM/NIfTI I/O
-pip install "medaugment[io]"
+pip install "medaugmentx[io]"
 
 # With YAML serialisation support
-pip install "medaugment[yaml]"
+pip install "medaugmentx[yaml]"
 ```
 
 Verify the installation:
 
 ```python
-import medaugment
-print(medaugment.__version__)   # 0.2.0
+import medaugmentx
+print(medaugmentx.__version__)   # 0.2.0
 ```
 
 ---
@@ -60,7 +60,7 @@ print(medaugment.__version__)   # 0.2.0
 The fastest way to get started is a pre-built modality preset:
 
 ```python
-from medaugment.presets import mri_pipeline, ct_pipeline, dxr_pipeline, dbt_pipeline
+from medaugmentx.presets import mri_pipeline, ct_pipeline, dxr_pipeline, dbt_pipeline
 
 pipeline = mri_pipeline(seed=42)
 augmented = pipeline(vol)          # MedVolume in, MedVolume out
@@ -72,8 +72,8 @@ Four presets ship out of the box — see [Preset pipelines](#preset-pipelines) b
 
 ```python
 import numpy as np
-from medaugment import MedVolume, Compose, OneOf
-from medaugment.transforms import (
+from medaugmentx import MedVolume, Compose, OneOf
+from medaugmentx.transforms import (
     RandomAffine, ElasticDeform,
     BiasField, RicianNoise, GaussianNoise, GammaCorrection,
 )
@@ -111,7 +111,7 @@ Ready-to-use `Compose` pipelines for common modalities. All presets are
 seeded, deterministic, and serialisable.
 
 ```python
-from medaugment.presets import mri_pipeline, ct_pipeline, dxr_pipeline, dbt_pipeline
+from medaugmentx.presets import mri_pipeline, ct_pipeline, dxr_pipeline, dbt_pipeline
 
 mri  = mri_pipeline(seed=42)   # bias field, Rician noise, ghosting/k-space
 ct   = ct_pipeline(seed=42)    # window/level, Gaussian noise, beam hardening
@@ -129,7 +129,7 @@ your dataset.
 Pipelines serialise to JSON (built-in) or YAML (optional PyYAML):
 
 ```python
-from medaugment.serialization import to_json, from_json
+from medaugmentx.serialization import to_json, from_json
 
 pipeline = mri_pipeline(seed=42)
 
@@ -146,7 +146,7 @@ out = pipeline2(vol)
 Custom transforms can be added to the registry so they serialise too:
 
 ```python
-from medaugment.serialization import REGISTRY
+from medaugmentx.serialization import REGISTRY
 REGISTRY["MyTransform"] = MyTransform
 ```
 
@@ -155,7 +155,7 @@ REGISTRY["MyTransform"] = MyTransform
 ## Loading real volumes
 
 ```python
-from medaugment.io import load_dicom_series, load_nifti, save_nifti
+from medaugmentx.io import load_dicom_series, load_nifti, save_nifti
 
 vol_ct  = load_dicom_series("/path/to/study/CT_chest/")  # MedVolume
 vol_mri = load_nifti("brain_t1.nii.gz")                   # MedVolume
@@ -167,7 +167,7 @@ save_nifti(augmented, "ct_augmented.nii.gz")
 Both loaders populate `spacing` and `metadata` (modality, vendor, DICOM tags)
 automatically.
 
-> Requires the `io` extra: `pip install "medaugment[io]"`
+> Requires the `io` extra: `pip install "medaugmentx[io]"`
 
 ---
 

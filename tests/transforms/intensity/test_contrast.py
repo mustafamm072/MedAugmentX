@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from medaugment.core import MedVolume
-from medaugment.transforms import GammaCorrection
+from medaugmentx.core import MedVolume
+from medaugmentx.transforms import GammaCorrection
 
 
 def test_gamma_one_is_near_identity():

@@ -9,6 +9,6 @@ Closes #...
 - [ ] Type hints on all new public APIs.
 - [ ] Docstrings on new transforms (effect, modality, parameters).
 - [ ] If spatial transform: mask consistency test included.
-- [ ] If new public name: re-exported from `medaugment/__init__.py`.
+- [ ] If new public name: re-exported from `medaugmentx/__init__.py`.
 - [ ] CHANGELOG updated.
 - [ ] CI green (pytest + ruff).

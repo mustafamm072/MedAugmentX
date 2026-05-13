@@ -18,8 +18,8 @@ from __future__ import annotations
 import argparse
 import sys
 
-from medaugment import Compose
-from medaugment.transforms import (
+from medaugmentx import Compose
+from medaugmentx.transforms import (
     BiasField,
     ElasticDeform,
     GammaCorrection,
@@ -31,7 +31,7 @@ from medaugment.transforms import (
 
 
 def build_mri_pipeline(seed: int) -> Compose:
-    from medaugment.transforms import RicianNoise
+    from medaugmentx.transforms import RicianNoise
     return Compose([
         RandomFlip(axes=("x",), p_per_axis=0.5),
         RandomAffine(rotation=10.0, scale=(0.9, 1.1), translation=(-0.05, 0.05), p=0.7),
@@ -55,9 +55,9 @@ def build_ct_pipeline(seed: int) -> Compose:
 
 def load(path: str):
     if path.endswith(".nii") or path.endswith(".nii.gz"):
-        from medaugment.io import load_nifti
+        from medaugmentx.io import load_nifti
         return "nifti", load_nifti(path)
-    from medaugment.io import load_dicom_series
+    from medaugmentx.io import load_dicom_series
     return "dicom", load_dicom_series(path)
 
 
@@ -65,7 +65,7 @@ def save_if_possible(kind: str, vol, path: str | None) -> None:
     if path is None:
         return
     if kind == "nifti":
-        from medaugment.io import save_nifti
+        from medaugmentx.io import save_nifti
         save_nifti(vol, path)
         print(f"saved -> {path}")
     else:
@@ -89,7 +89,7 @@ def main() -> int:
         kind, vol = load(args.input)
     except ImportError as exc:
         print(f"Missing optional dependency: {exc}", file=sys.stderr)
-        print("Install with: pip install \"medaugment[io]\"", file=sys.stderr)
+        print("Install with: pip install \"medaugmentx[io]\"", file=sys.stderr)
         return 2
 
     print("loaded :", vol)

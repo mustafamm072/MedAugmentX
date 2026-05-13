@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from medaugment import Compose, MedVolume
-from medaugment.presets import dbt_pipeline
-from medaugment.transforms import (
+from medaugmentx import Compose, MedVolume
+from medaugmentx.presets import dbt_pipeline
+from medaugmentx.transforms import (
     AnisotropicElastic,
     BiasField,
     GammaCorrection,

@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from medaugment.core import MedVolume
-from medaugment.transforms import GaussianNoise, RicianNoise
+from medaugmentx.core import MedVolume
+from medaugmentx.transforms import GaussianNoise, RicianNoise
 
 
 def test_gaussian_noise_changes_image_but_preserves_shape():

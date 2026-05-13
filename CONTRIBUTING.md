@@ -1,13 +1,13 @@
-# Contributing to MedAugment
+# Contributing to MedAugmentX
 
-Thanks for your interest in MedAugment. This guide covers the development
+Thanks for your interest in MedAugmentX. This guide covers the development
 setup, the project conventions, and what we look for in pull requests.
 
 ## Development setup
 
 ```bash
-git clone https://github.com/medaugment/medaugment.git
-cd medaugment
+git clone https://github.com/medaugmentx/medaugmentx.git
+cd medaugmentx
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 pytest
@@ -19,7 +19,7 @@ and `mypy`.
 ## Repository layout
 
 ```
-medaugment/                 # Library source
+medaugmentx/                 # Library source
   core/                     # MedVolume, Transform base, Compose/OneOf/SomeOf
   transforms/               # Spatial, intensity, modality-specific transforms
     spatial/                # RandomAffine, RandomFlip, ElasticDeform, AnatomicCrop
@@ -56,7 +56,7 @@ Use this template:
 ```python
 from __future__ import annotations
 from typing import Any
-from medaugment.core import Transform, MedVolume
+from medaugmentx.core import Transform, MedVolume
 
 class MyTransform(Transform):
     """One-line summary.
@@ -90,7 +90,7 @@ the transform. Register the class in `REGISTRY` if users will serialise
 pipelines that include it:
 
 ```python
-from medaugment.serialization import REGISTRY
+from medaugmentx.serialization import REGISTRY
 REGISTRY["MyTransform"] = MyTransform
 ```
 
@@ -98,9 +98,9 @@ Built-in transforms are registered automatically in `serialization.py`.
 
 Then:
 
-1. Add the class to the appropriate `medaugment/transforms/<group>/` module.
-2. Re-export it from `medaugment/transforms/__init__.py`.
-3. Register it in `REGISTRY` inside `medaugment/serialization.py` (`_register_builtins`).
+1. Add the class to the appropriate `medaugmentx/transforms/<group>/` module.
+2. Re-export it from `medaugmentx/transforms/__init__.py`.
+3. Register it in `REGISTRY` inside `medaugmentx/serialization.py` (`_register_builtins`).
 4. Add tests in `tests/transforms/<group>/test_<name>.py` covering:
    - output shape and dtype,
    - mask/image consistency (if spatial),
@@ -114,10 +114,10 @@ Then:
 pytest                                   # full suite
 pytest tests/core                        # one module
 pytest -m "not slow"                     # skip slow tests
-pytest --cov=medaugment --cov-report=term-missing
+pytest --cov=medaugmentx --cov-report=term-missing
 ```
 
-We aim for ≥ 90% coverage on `medaugment/core` and `medaugment/transforms`.
+We aim for ≥ 90% coverage on `medaugmentx/core` and `medaugmentx/transforms`.
 I/O tests are marked `@pytest.mark.io` and skipped automatically when the
 optional dependency (`pydicom`, `nibabel`) is not installed.
 
@@ -143,7 +143,7 @@ same patient — important for cross-study robustness.
 
 Please include:
 
-- MedAugment version (`pip show medaugment`),
+- MedAugmentX version (`pip show medaugmentx`),
 - a minimal `MedVolume` (shape, dtype, spacing) that reproduces the issue,
 - the full traceback,
 - modality and, if known, the originating scanner vendor.

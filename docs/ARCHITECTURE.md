@@ -6,10 +6,10 @@ layout and the rules each layer follows.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ Presets  (medaugment/presets.py)                                │
+│ Presets  (medaugmentx/presets.py)                                │
 │   mri_pipeline · ct_pipeline · dxr_pipeline · dbt_pipeline     │
 ├─────────────────────────────────────────────────────────────────┤
-│ Serialisation  (medaugment/serialization.py)                    │
+│ Serialisation  (medaugmentx/serialization.py)                    │
 │   REGISTRY · from_dict · to_json / from_json · to_yaml / from_yaml │
 ├─────────────────────────────────────────────────────────────────┤
 │ User pipeline  (Compose · OneOf · SomeOf)                       │
@@ -31,7 +31,7 @@ layout and the rules each layer follows.
 
 ---
 
-## 1. Core layer (`medaugment/core/`)
+## 1. Core layer (`medaugmentx/core/`)
 
 The foundational types. **Nothing else in the library may import upward into
 user code, and core has no dependencies beyond NumPy.**
@@ -75,7 +75,7 @@ base class handles:
 - probability gating (`p` in `[0, 1]`),
 - the `self.rng` generator (always used in transforms, never `np.random`),
 - `to_dict()` — returns a dict suitable for reconstruction via
-  `medaugment.serialization.from_dict()`.
+  `medaugmentx.serialization.from_dict()`.
 
 ### `Compose`, `OneOf`, `SomeOf` (`core/compose.py`)
 
@@ -100,7 +100,7 @@ recursively, enabling lossless round-trip serialisation of entire pipelines.
 
 ---
 
-## 2. Transforms layer (`medaugment/transforms/`)
+## 2. Transforms layer (`medaugmentx/transforms/`)
 
 Subdivided by *what* changes about the image:
 
@@ -148,7 +148,7 @@ parameter names, or explicitly map them in `to_dict()`.
 
 ---
 
-## 3. Serialisation (`medaugment/serialization.py`)
+## 3. Serialisation (`medaugmentx/serialization.py`)
 
 Enables lossless round-trip persistence of any pipeline.
 
@@ -161,7 +161,7 @@ pipeline  ──to_yaml()──►  YAML string  ──from_yaml()──►  pip
 registered at import time. Custom transforms can be added:
 
 ```python
-from medaugment.serialization import REGISTRY
+from medaugmentx.serialization import REGISTRY
 REGISTRY["MyTransform"] = MyTransform
 ```
 
@@ -174,7 +174,7 @@ JSON serialisation uses only the Python standard library. YAML is optional
 
 ---
 
-## 4. Presets (`medaugment/presets.py`)
+## 4. Presets (`medaugmentx/presets.py`)
 
 Four factory functions return fully-configured, seeded `Compose` pipelines:
 
@@ -189,7 +189,7 @@ All presets are serialisable via `to_json` / `to_yaml`.
 
 ---
 
-## 5. I/O layer (`medaugment/io/`)
+## 5. I/O layer (`medaugmentx/io/`)
 
 Loaders are **optional dependencies**. Top-level imports do not require
 `pydicom` or `nibabel`; the helpers raise a clear `ImportError` only when
@@ -242,7 +242,7 @@ in a deep-learning framework by default.
 
 ## 8. Public surface
 
-The flat re-export in `medaugment/transforms/__init__.py` is the canonical
-import path. Internal modules (`medaugment/transforms/intensity/bias_field.py`,
+The flat re-export in `medaugmentx/transforms/__init__.py` is the canonical
+import path. Internal modules (`medaugmentx/transforms/intensity/bias_field.py`,
 etc.) may move between minor versions; the public surface follows SemVer once
 we hit `1.0`.

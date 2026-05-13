@@ -2,8 +2,8 @@
 import numpy as np
 import pytest
 
-from medaugment.core import MedVolume
-from medaugment.transforms import GhostingArtifact, KSpaceDropout
+from medaugmentx.core import MedVolume
+from medaugmentx.transforms import GhostingArtifact, KSpaceDropout
 
 
 @pytest.fixture

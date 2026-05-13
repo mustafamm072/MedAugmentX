@@ -33,15 +33,15 @@ jobs:
       - name: Lint (ruff)
         run: |
           pip install ruff
-          ruff check medaugment tests
+          ruff check medaugmentx tests
 
       - name: Type check (mypy)
         run: |
           pip install mypy
-          mypy medaugment --ignore-missing-imports || true
+          mypy medaugmentx --ignore-missing-imports || true
 
       - name: Run tests
-        run: pytest --cov=medaugment --cov-report=xml -q
+        run: pytest --cov=medaugmentx --cov-report=xml -q
 
       - name: Upload coverage
         if: matrix.python-version == '3.12'

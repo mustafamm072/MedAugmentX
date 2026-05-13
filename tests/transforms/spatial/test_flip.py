@@ -1,7 +1,7 @@
 import numpy as np
 
-from medaugment.core import MedVolume
-from medaugment.transforms import RandomFlip
+from medaugmentx.core import MedVolume
+from medaugmentx.transforms import RandomFlip
 
 
 def test_flip_x_2d_changes_image_and_mask_consistently():

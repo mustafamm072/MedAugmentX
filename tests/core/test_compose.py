@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from medaugment.core import Compose, MedVolume, OneOf, SomeOf, Transform
+from medaugmentx.core import Compose, MedVolume, OneOf, SomeOf, Transform
 
 
 class AddConstant(Transform):

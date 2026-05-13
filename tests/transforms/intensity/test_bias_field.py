@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from medaugment.core import MedVolume
-from medaugment.transforms import BiasField
+from medaugmentx.core import MedVolume
+from medaugmentx.transforms import BiasField
 
 
 @pytest.fixture

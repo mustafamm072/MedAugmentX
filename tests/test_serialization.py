@@ -4,9 +4,9 @@ import json
 import numpy as np
 import pytest
 
-from medaugment import Compose, MedVolume, OneOf, SomeOf
-from medaugment.serialization import REGISTRY, from_dict, from_json, to_json
-from medaugment.transforms import (
+from medaugmentx import Compose, MedVolume, OneOf, SomeOf
+from medaugmentx.serialization import REGISTRY, from_dict, from_json, to_json
+from medaugmentx.transforms import (
     AnatomicCrop,
     AnisotropicElastic,
     BeamHardening,

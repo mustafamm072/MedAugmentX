@@ -10,9 +10,9 @@ import json
 
 import numpy as np
 
-from medaugment import Compose, MedVolume, OneOf
-from medaugment.serialization import from_json, to_json
-from medaugment.transforms import (
+from medaugmentx import Compose, MedVolume, OneOf
+from medaugmentx.serialization import from_json, to_json
+from medaugmentx.transforms import (
     BiasField,
     ElasticDeform,
     GammaCorrection,

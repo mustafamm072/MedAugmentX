@@ -18,21 +18,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `GaussianBlur` — isotropic Gaussian blur with sigma range.
 - `SimulateLowResolution` — downsample + upsample to simulate cross-site resolution variation.
 
-**Modality transforms — MRI** (`medaugment.transforms.modality.mri`)
+**Modality transforms — MRI** (`medaugmentx.transforms.modality.mri`)
 - `GhostingArtifact` — phase-encoding ghosting (shifted attenuated replica).
 - `KSpaceDropout` — random k-space line zeroing with correct Gibbs ringing reconstruction.
 
-**Modality transforms — CT** (`medaugment.transforms.modality.ct`)
+**Modality transforms — CT** (`medaugmentx.transforms.modality.ct`)
 - `BeamHardening` — radially-symmetric cupping artifact simulation.
 
-**Serialisation** (`medaugment.serialization`)
+**Serialisation** (`medaugmentx.serialization`)
 - `to_json` / `from_json` — lossless JSON round-trip for any transform or pipeline.
 - `to_yaml` / `from_yaml` — optional YAML round-trip (requires `pip install pyyaml`).
 - `REGISTRY` — dict mapping class names to classes; extend for custom transforms.
 - All built-in transforms override `to_dict()` to produce round-trippable dicts.
 - `Compose`, `OneOf`, `SomeOf` now serialise children recursively.
 
-**Presets** (`medaugment.presets`)
+**Presets** (`medaugmentx.presets`)
 - `mri_pipeline(seed)` — MRI spatial + bias field + Rician noise + optional ghosting.
 - `ct_pipeline(seed)` — CT spatial + window/level + Gaussian noise + beam hardening.
 - `dxr_pipeline(seed)` — Digital X-ray spatial + blur + brightness/contrast + gamma.

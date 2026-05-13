@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from medaugment.core import MedVolume, Transform
+from medaugmentx.core import MedVolume, Transform
 
 
 class Identity(Transform):

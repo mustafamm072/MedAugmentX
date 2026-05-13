@@ -1,7 +1,7 @@
 import numpy as np
 
-from medaugment.core import MedVolume
-from medaugment.transforms import RandomAffine
+from medaugmentx.core import MedVolume
+from medaugmentx.transforms import RandomAffine
 
 
 def test_zero_params_is_near_identity():

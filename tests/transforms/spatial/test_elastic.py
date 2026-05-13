@@ -1,7 +1,7 @@
 import numpy as np
 
-from medaugment.core import MedVolume
-from medaugment.transforms import ElasticDeform
+from medaugmentx.core import MedVolume
+from medaugmentx.transforms import ElasticDeform
 
 
 def test_zero_alpha_is_near_identity():

@@ -3,14 +3,14 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "medaugment"
+name = "medaugmentx"
 version = "0.2.0"
 description = "Clinically-aware medical image augmentation for AI training (MRI, CT, X-Ray, Tomosynthesis)."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [
-    { name = "MedAugment Contributors" },
+    { name = "MedAugmentX Contributors" },
 ]
 keywords = [
     "medical-imaging",
@@ -69,13 +69,13 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/medaugment/medaugment"
-Documentation = "https://github.com/medaugment/medaugment/tree/main/docs"
-Source = "https://github.com/medaugment/medaugment"
-Issues = "https://github.com/medaugment/medaugment/issues"
+Homepage = "https://github.com/medaugmentx/medaugmentx"
+Documentation = "https://github.com/medaugmentx/medaugmentx/tree/main/docs"
+Source = "https://github.com/medaugmentx/medaugmentx"
+Issues = "https://github.com/medaugmentx/medaugmentx/issues"
 
 [tool.setuptools.packages.find]
-include = ["medaugment*"]
+include = ["medaugmentx*"]
 exclude = ["tests*", "examples*", "docs*"]
 
 [tool.pytest.ini_options]

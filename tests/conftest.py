@@ -4,7 +4,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from medaugment.core import MedVolume
+from medaugmentx.core import MedVolume
 
 
 @pytest.fixture

@@ -6,7 +6,7 @@ pydicom = pytest.importorskip("pydicom")
 from pydicom.dataset import FileDataset, FileMetaDataset
 from pydicom.uid import ExplicitVRLittleEndian, generate_uid
 
-from medaugment.io import load_dicom_series
+from medaugmentx.io import load_dicom_series
 
 pytestmark = pytest.mark.io
 

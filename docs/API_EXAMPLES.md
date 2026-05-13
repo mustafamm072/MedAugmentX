@@ -26,7 +26,7 @@ print(vol)
 ## 2. Apply a single transform
 
 ```python
-from medaugment.transforms import RandomFlip
+from medaugmentx.transforms import RandomFlip
 
 augmented = RandomFlip(axes=("x",), p_per_axis=1.0, seed=0)(vol)
 ```
@@ -37,7 +37,7 @@ augmented = RandomFlip(axes=("x",), p_per_axis=1.0, seed=0)(vol)
 
 ```python
 from medaugment import Compose, OneOf
-from medaugment.transforms import (
+from medaugmentx.transforms import (
     RandomAffine, ElasticDeform,
     RicianNoise, GaussianNoise,
     GammaCorrection,
@@ -65,7 +65,7 @@ output on every run, on every machine.
 
 ```python
 from medaugment import Compose, OneOf
-from medaugment.transforms import (
+from medaugmentx.transforms import (
     RandomAffine, ElasticDeform, RandomFlip,
     BiasField, RicianNoise, GammaCorrection,
     GhostingArtifact, KSpaceDropout,
@@ -88,7 +88,7 @@ mri_pipeline = Compose([
 Or use the pre-built preset:
 
 ```python
-from medaugment.presets import mri_pipeline
+from medaugmentx.presets import mri_pipeline
 
 pipeline = mri_pipeline(seed=0)
 augmented = pipeline(vol)
@@ -100,7 +100,7 @@ augmented = pipeline(vol)
 
 ```python
 from medaugment import Compose
-from medaugment.transforms import (
+from medaugmentx.transforms import (
     RandomAffine, ElasticDeform, RandomFlip,
     WindowLevel, GaussianNoise, GammaCorrection,
     BeamHardening,
@@ -122,7 +122,7 @@ ct_pipeline = Compose([
 ## 6. Tomosynthesis (DBT) pipeline
 
 ```python
-from medaugment.presets import dbt_pipeline
+from medaugmentx.presets import dbt_pipeline
 
 pipeline = dbt_pipeline(seed=0)
 augmented = pipeline(dbt_vol)
@@ -132,7 +132,7 @@ Or assembled manually:
 
 ```python
 from medaugment import Compose
-from medaugment.transforms import (
+from medaugmentx.transforms import (
     RandomFlip, RandomAffine, AnisotropicElastic,
     SlabShift, LimitedAngleBlur, SliceDropout,
     BiasField, GammaCorrection,
@@ -155,7 +155,7 @@ pipeline = Compose([
 ## 7. Load a DICOM series or NIfTI file
 
 ```python
-from medaugment.io import load_dicom_series, load_nifti, save_nifti
+from medaugmentx.io import load_dicom_series, load_nifti, save_nifti
 
 vol_ct  = load_dicom_series("/data/studies/12345/CT_chest/")  # MedVolume
 vol_mri = load_nifti("brain_t1.nii.gz")                        # MedVolume
@@ -167,15 +167,15 @@ save_nifti(augmented, "ct_augmented.nii.gz")
 Both loaders populate `spacing` and `metadata` (modality, vendor, DICOM tags)
 automatically.
 
-> Requires the `io` extra: `pip install "medaugment[io]"`
+> Requires the `io` extra: `pip install "medaugmentx[io]"`
 
 ---
 
 ## 8. Serialise a pipeline to JSON and reload it
 
 ```python
-from medaugment.presets import mri_pipeline
-from medaugment.serialization import to_json, from_json
+from medaugmentx.presets import mri_pipeline
+from medaugmentx.serialization import to_json, from_json
 
 pipeline = mri_pipeline(seed=42)
 
@@ -192,7 +192,7 @@ out = pipeline2(vol)
 Optional YAML round-trip (requires `pip install pyyaml`):
 
 ```python
-from medaugment.serialization import to_yaml, from_yaml
+from medaugmentx.serialization import to_yaml, from_yaml
 
 yaml_str = to_yaml(pipeline)
 pipeline3 = from_yaml(yaml_str)
@@ -206,8 +206,8 @@ PyTorch is **not** a MedAugment dependency. Wire it up in your own dataset:
 
 ```python
 from torch.utils.data import Dataset
-from medaugment.io import load_nifti
-from medaugment.presets import mri_pipeline
+from medaugmentx.io import load_nifti
+from medaugmentx.presets import mri_pipeline
 
 class MRIVolumes(Dataset):
     def __init__(self, paths):
@@ -249,7 +249,7 @@ how many samples were drawn in epoch 1.
 
 ```python
 from typing import Any
-from medaugment.core import Transform, MedVolume
+from medaugmentx.core import Transform, MedVolume
 
 class IntensityShift(Transform):
     """Add a uniform random offset to all voxels."""
@@ -272,7 +272,7 @@ class IntensityShift(Transform):
 Register it for serialisation if needed:
 
 ```python
-from medaugment.serialization import REGISTRY
+from medaugmentx.serialization import REGISTRY
 REGISTRY["IntensityShift"] = IntensityShift
 ```
 
@@ -299,7 +299,7 @@ print(json.dumps(pipeline.to_dict(), indent=2, default=str))
 ```python
 import numpy as np
 from medaugment import Compose
-from medaugment.transforms import GaussianNoise, GammaCorrection
+from medaugmentx.transforms import GaussianNoise, GammaCorrection
 
 # Same instance — RNG advances each call, so output differs
 a = pipeline(vol)

@@ -16,10 +16,10 @@ from typing import Any
 
 import numpy as np
 
-from medaugment import Compose, MedVolume
-from medaugment.core import Transform
-from medaugment.serialization import REGISTRY, from_json, to_json
-from medaugment.transforms import GaussianNoise
+from medaugmentx import Compose, MedVolume
+from medaugmentx.core import Transform
+from medaugmentx.serialization import REGISTRY, from_json, to_json
+from medaugmentx.transforms import GaussianNoise
 
 
 class IntensityShift(Transform):

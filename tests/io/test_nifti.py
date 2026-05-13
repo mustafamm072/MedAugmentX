@@ -3,8 +3,8 @@ import pytest
 
 nibabel = pytest.importorskip("nibabel")
 
-from medaugment.core import MedVolume
-from medaugment.io import load_nifti, save_nifti
+from medaugmentx.core import MedVolume
+from medaugmentx.io import load_nifti, save_nifti
 
 pytestmark = pytest.mark.io
 
