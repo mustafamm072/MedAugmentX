@@ -2,6 +2,7 @@
 
 **Clinically-aware medical image augmentation for AI training.**
 
+[![DOI](https://zenodo.org/badge/1231536084.svg)](https://doi.org/10.5281/zenodo.20191189)
 [![Python](https://img.shields.io/badge/python-3.9%20%E2%80%93%203.14-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Status: Phase 2](https://img.shields.io/badge/status-phase%202-green.svg)](docs/MILESTONES.md)
