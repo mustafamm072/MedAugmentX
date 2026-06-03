@@ -1,7 +1,8 @@
 # Milestones & Roadmap
 
-MedAugment ships in three phases. Phases 1 and 2 are complete; Phase 3
-builds GPU acceleration, framework integrations, and the v1.0 release.
+MedAugmentX ships in three phases. Phases 1 and 2 are complete; Phase 3 is
+in progress and focuses on wider developer adoption, optional framework
+interop, GPU acceleration, comprehensive documentation, and the v1.0 release.
 
 ---
 
@@ -64,27 +65,32 @@ deferred to keep the release focused and the library lightweight:
 
 ---
 
-## Phase 3 — GPU, Framework Interop & v1.0
+## Phase 3 — Framework Interop, GPU & v1.0
 
-**Goal:** GPU acceleration, framework integration, benchmark suite,
-comprehensive documentation, and a stable v1.0 release.
+**Goal:** Make the library easier to adopt in academic and commercial
+training stacks while keeping the default install lightweight.
 
 ### Deliverables
 
-| # | Deliverable | Module |
-| --- | --- | --- |
-| 3.1 | PyTorch backend for GPU-accelerated spatial transforms | `backends/torch/` |
-| 3.2 | torchvision / MONAI / TorchIO compatibility wrappers | `interop/` |
-| 3.3 | Vendor DICOM parsers — Hologic, GE, Siemens | `io/dicom_vendor/` |
-| 3.4 | Remaining Phase 2 transforms (motion, scatter, CLAHE, …) | `transforms/modality/` |
-| 3.5 | Benchmark suite (speed, memory, augmentation diversity) | `benchmarks/` |
-| 3.6 | Sphinx documentation site + API reference | `docs/sphinx/` |
-| 3.7 | Jupyter tutorials (MRI, CT, DBT) | `notebooks/` |
-| 3.8 | v1.0 release + GitHub Actions CD pipeline | `.github/` |
+| # | Deliverable | Module | Status |
+| --- | --- | --- | --- |
+| 3.1 | Lightweight framework adapters for PyTorch/torchvision and MONAI-style samples | `medaugmentx/interop/` | ✅ `0.3.0` |
+| 3.2 | Typed package marker for downstream type checkers | `medaugmentx/py.typed` | ✅ `0.3.0` |
+| 3.3 | Developer API reference and updated examples | `docs/API_REFERENCE.md`, `docs/API_EXAMPLES.md` | ✅ `0.3.0` |
+| 3.4 | PyTorch backend for GPU-accelerated spatial transforms | `backends/torch/` | Planned |
+| 3.5 | TorchIO subject adapter and richer MONAI integration | `interop/` | Planned |
+| 3.6 | Vendor DICOM parsers — Hologic, GE, Siemens | `io/dicom_vendor/` | Planned |
+| 3.7 | Remaining deferred transforms (motion, scatter, CLAHE, …) | `transforms/modality/` | Planned |
+| 3.8 | Benchmark suite (speed, memory, augmentation diversity) | `benchmarks/` | Planned |
+| 3.9 | Sphinx documentation site | `docs/sphinx/` | Planned |
+| 3.10 | Jupyter tutorials (MRI, CT, DBT) | `notebooks/` | Planned |
+| 3.11 | v1.0 release + GitHub Actions CD pipeline | `.github/` | Planned |
 
 ### Acceptance criteria (Phase 3 / v1.0)
 
 - All Phase 1 and 2 deliverables shipped.
+- Default installation keeps only NumPy and SciPy as hard dependencies.
+- Framework-specific integrations are optional and import-lazy.
 - GPU speedup ≥ 5× vs CPU baseline for spatial transforms.
 - All transforms complete in < 500 ms on CPU for a 512×512×80 DBT volume.
 - CI/CD publishes wheels to PyPI on tag.

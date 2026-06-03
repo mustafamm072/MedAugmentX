@@ -1,10 +1,11 @@
 """DICOM series loader.
 
-Phase 1 ships a single, vendor-agnostic loader that handles the common case:
+MedAugmentX ships a single, vendor-agnostic loader that handles the common case:
 a directory of single-frame DICOMs (one per slice) sharing a SeriesInstanceUID.
-Vendor-specific multi-frame DBT parsers (Hologic, GE, Siemens) land in
-Phase 2 — see ``docs/MILESTONES.md``.
+Vendor-specific multi-frame DBT parsers (Hologic, GE, Siemens) are tracked in
+Phase 3 — see ``docs/MILESTONES.md``.
 """
+
 from __future__ import annotations
 
 import os
@@ -16,7 +17,7 @@ from medaugmentx.core.volume import MedVolume
 
 def _import_pydicom():
     try:
-        import pydicom  # type: ignore
+        import pydicom
     except ImportError as exc:  # pragma: no cover - exercised only without dep
         raise ImportError(
             "pydicom is required for DICOM I/O. Install with: pip install 'medaugmentx[dicom]'"
@@ -136,7 +137,7 @@ def load_dicom_series(path: str) -> MedVolume:
 
         if image.ndim == 2:
             ps = _safe_get(ds, "PixelSpacing", [1.0, 1.0])
-            spacing = (float(ps[0]), float(ps[1]))
+            spacing: tuple[float, ...] = (float(ps[0]), float(ps[1]))
         else:
             ps = _safe_get(ds, "PixelSpacing", [1.0, 1.0])
             thickness = float(_safe_get(ds, "SliceThickness", 1.0))
@@ -173,7 +174,9 @@ def load_dicom_series(path: str) -> MedVolume:
 
     if len(positions) >= 2:
         diffs = np.diff(positions)
-        z_spacing = float(np.median(np.abs(diffs))) or float(_safe_get(ref_ds, "SliceThickness", 1.0))
+        z_spacing = float(np.median(np.abs(diffs))) or float(
+            _safe_get(ref_ds, "SliceThickness", 1.0)
+        )
     else:
         z_spacing = float(_safe_get(ref_ds, "SliceThickness", 1.0))
 

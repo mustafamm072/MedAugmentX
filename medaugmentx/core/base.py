@@ -1,4 +1,4 @@
-"""Abstract base class that every MedAugment transform inherits from."""
+"""Abstract base class that every MedAugmentX transform inherits from."""
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

@@ -11,7 +11,7 @@ import numpy as np
 class MedVolume:
     """A single medical image (2D or 3D) with optional segmentation mask.
 
-    All transforms in MedAugment operate on this container so that masks and
+    All transforms in MedAugmentX operate on this container so that masks and
     metadata stay in lockstep with the image array.
 
     Attributes:

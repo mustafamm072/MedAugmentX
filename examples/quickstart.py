@@ -1,4 +1,4 @@
-"""Hello-world MedAugment pipeline.
+"""Hello-world MedAugmentX pipeline.
 
 Run with:
 

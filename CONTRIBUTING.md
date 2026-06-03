@@ -28,10 +28,11 @@ medaugmentx/                 # Library source
     modality/ct/            # BeamHardening
     modality/tomosynthesis/ # SlabShift, LimitedAngleBlur, SliceDropout, …
   io/                       # DICOM, NIfTI loaders (optional dependency)
+  interop/                  # Framework adapters for dataset samples
   presets.py                # mri_pipeline, ct_pipeline, dxr_pipeline, dbt_pipeline
   serialization.py          # to_json / from_json / to_yaml / from_yaml / REGISTRY
 tests/                      # Mirrors the source layout
-docs/                       # Architecture, milestones, API examples
+docs/                       # Architecture, milestones, API reference, API examples
 examples/                   # Runnable scripts
 ```
 
@@ -39,7 +40,7 @@ examples/                   # Runnable scripts
 
 - **Type hints everywhere.** Public functions and classes are fully typed.
 - **Numpy first.** Core ops use `numpy` and `scipy.ndimage`. Heavy ML
-  frameworks are reserved for Phase 3 backends and stay optional.
+  frameworks stay optional and must not be imported by core modules.
 - **Mask consistency is non-negotiable.** Spatial transforms must use
   nearest-neighbour interpolation for masks and the *same* random sample as
   the image. Add a regression test for any new spatial transform proving this.

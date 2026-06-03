@@ -1,11 +1,14 @@
 # Architecture
 
-MedAugment is a layered library. Each layer has one responsibility, no
+MedAugmentX is a layered library. Each layer has one responsibility, no
 upward dependencies, and a flat public surface. This document explains the
 layout and the rules each layer follows.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
+│ Interop  (medaugmentx/interop/)                                  │
+│   SampleTransform · TorchTransform · MonaiMapTransform           │
+├─────────────────────────────────────────────────────────────────┤
 │ Presets  (medaugmentx/presets.py)                                │
 │   mri_pipeline · ct_pipeline · dxr_pipeline · dbt_pipeline     │
 ├─────────────────────────────────────────────────────────────────┤
@@ -27,6 +30,7 @@ layout and the rules each layer follows.
             numpy + scipy (always present)
             pydicom + nibabel (optional, behind extras)
             pyyaml (optional, behind [yaml] extra)
+            torch + monai (optional, behind framework extras)
 ```
 
 ---
@@ -189,7 +193,29 @@ All presets are serialisable via `to_json` / `to_yaml`.
 
 ---
 
-## 5. I/O layer (`medaugmentx/io/`)
+## 5. Interop layer (`medaugmentx/interop/`)
+
+Framework adapters sit above the core transform API. They make the library
+usable in PyTorch, torchvision, and MONAI-style training code without making
+those frameworks hard dependencies.
+
+| Adapter | Purpose |
+| --- | --- |
+| `SampleTransform` | Generic adapter for `MedVolume`, arrays/tensors, `(image, mask)`, and dict samples |
+| `TorchTransform` | PyTorch / torchvision-friendly alias of `SampleTransform` |
+| `MonaiMapTransform` | Dict adapter with `image` / `label` defaults |
+
+Import rule: `medaugmentx.interop` must not import PyTorch or MONAI
+at module import time. Tensor support is duck-typed and restores torch tensors
+only when a torch tensor is actually passed.
+
+Channel rule: MedAugmentX transforms operate on single-channel 2D/3D images.
+Adapters may strip one singleton channel axis before augmentation and restore
+it after augmentation.
+
+---
+
+## 6. I/O layer (`medaugmentx/io/`)
 
 Loaders are **optional dependencies**. Top-level imports do not require
 `pydicom` or `nibabel`; the helpers raise a clear `ImportError` only when
@@ -208,7 +234,7 @@ applies `RescaleSlope * pixels + RescaleIntercept`, and reads spacing from
 
 ---
 
-## 6. Dependencies
+## 7. Dependencies
 
 | Layer | Required | Optional |
 | --- | --- | --- |
@@ -216,14 +242,14 @@ applies `RescaleSlope * pixels + RescaleIntercept`, and reads spacing from
 | Transforms | `scipy` | — |
 | Serialisation | — | `pyyaml` (YAML only; JSON uses stdlib) |
 | I/O | — | `pydicom`, `nibabel` |
+| Interop | — | `torch`, `monai` |
 
-Phase 3 adds an optional PyTorch backend for GPU-accelerated spatial
-transforms; it stays behind an extra so installing MedAugment never pulls
-in a deep-learning framework by default.
+Phase 3 framework support stays behind extras so installing MedAugmentX never
+pulls in a deep-learning framework by default.
 
 ---
 
-## 7. Testing strategy
+## 8. Testing strategy
 
 - **Unit tests** for every transform — output shape, dtype, value range,
   reproducibility under a fixed seed, `p=0` boundary, mask untouched.
@@ -237,12 +263,15 @@ in a deep-learning framework by default.
   round-trips through serialisation.
 - **I/O tests** are marked `@pytest.mark.io` and skipped automatically when
   the optional dependency is missing.
+- **Interop tests** verify dict, tuple/list, channel-restoration, and
+  MONAI-style label-key behavior without requiring PyTorch to be installed.
 
 ---
 
-## 8. Public surface
+## 9. Public surface
 
 The flat re-export in `medaugmentx/transforms/__init__.py` is the canonical
 import path. Internal modules (`medaugmentx/transforms/intensity/bias_field.py`,
 etc.) may move between minor versions; the public surface follows SemVer once
-we hit `1.0`.
+we hit `1.0`. The developer-facing reference lives in
+[API_REFERENCE.md](API_REFERENCE.md).

@@ -1,4 +1,5 @@
 """NIfTI reader and writer (single-file ``.nii`` / ``.nii.gz``)."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -10,7 +11,7 @@ from medaugmentx.core.volume import MedVolume
 
 def _import_nibabel():
     try:
-        import nibabel  # type: ignore
+        import nibabel
     except ImportError as exc:  # pragma: no cover - exercised only without dep
         raise ImportError(
             "nibabel is required for NIfTI I/O. Install with: pip install 'medaugmentx[nifti]'"
@@ -22,7 +23,7 @@ def load_nifti(path: str, dtype: Any | None = np.float32) -> MedVolume:
     """Load a NIfTI file (``.nii`` / ``.nii.gz``) into a ``MedVolume``.
 
     The image data is transposed from NIfTI's ``(X, Y, Z)`` ordering to the
-    ``(Z, Y, X)`` ordering used throughout MedAugment, and the spacing
+    ``(Z, Y, X)`` ordering used throughout MedAugmentX, and the spacing
     tuple is reordered to match.
 
     Args:
@@ -48,7 +49,7 @@ def load_nifti(path: str, dtype: Any | None = np.float32) -> MedVolume:
     if data.ndim == 3:
         # NIfTI stores (X, Y, Z); MedVolume uses (Z, Y, X).
         data = np.transpose(data, (2, 1, 0))
-        spacing = (float(zooms[2]), float(zooms[1]), float(zooms[0]))
+        spacing: tuple[float, ...] = (float(zooms[2]), float(zooms[1]), float(zooms[0]))
     else:
         # 2D: (X, Y) -> (Y, X)
         data = np.transpose(data, (1, 0))
@@ -94,7 +95,7 @@ def save_nifti(volume: MedVolume, path: str) -> None:
 
     img = nib.Nifti1Image(np.asarray(data), affine)
     if volume.is_3d:
-        zooms = (volume.spacing[2], volume.spacing[1], volume.spacing[0])
+        zooms: tuple[float, ...] = (volume.spacing[2], volume.spacing[1], volume.spacing[0])
     else:
         zooms = (volume.spacing[1], volume.spacing[0])
     img.header.set_zooms(zooms)

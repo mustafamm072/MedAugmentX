@@ -1,4 +1,4 @@
-"""All MedAugment transforms re-exported as a flat namespace."""
+"""All MedAugmentX transforms re-exported as a flat namespace."""
 # Spatial
 # Intensity
 from medaugmentx.transforms.intensity.bias_field import BiasField

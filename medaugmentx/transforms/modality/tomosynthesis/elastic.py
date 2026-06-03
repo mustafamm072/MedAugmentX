@@ -1,8 +1,11 @@
 """AnisotropicElastic — DBT-tuned elastic deformation."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
 from typing import Any
+
+import numpy as np
 
 from medaugmentx.core.base import Transform
 from medaugmentx.core.utils import SeedLike
@@ -38,17 +41,19 @@ class AnisotropicElastic(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
-        if len(tuple(alpha)) != 3 or len(tuple(sigma)) != 3:
+        self.alpha = tuple(float(a) for a in alpha)
+        self.sigma = tuple(float(s) for s in sigma)
+        if len(self.alpha) != 3 or len(self.sigma) != 3:
             raise ValueError("AnisotropicElastic expects 3-element alpha/sigma for DBT volumes")
         self._inner = ElasticDeform(
-            alpha=tuple(alpha),
-            sigma=tuple(sigma),
+            alpha=self.alpha,
+            sigma=self.sigma,
             order=order,
             p=1.0,
             seed=self.rng,
         )
 
-    def set_rng(self, rng) -> None:  # type: ignore[override]
+    def set_rng(self, rng: np.random.Generator) -> None:
         super().set_rng(rng)
         # Keep the inner transform's RNG synchronised with ours.
         self._inner.set_rng(rng)
@@ -62,8 +67,8 @@ class AnisotropicElastic(Transform):
         return {
             "name": self.__class__.__name__,
             "params": {
-                "alpha": list(self._inner.alpha_spec),
-                "sigma": list(self._inner.sigma_spec),
+                "alpha": list(self.alpha),
+                "sigma": list(self.sigma),
                 "order": self._inner.order,
                 "p": self.p,
             },

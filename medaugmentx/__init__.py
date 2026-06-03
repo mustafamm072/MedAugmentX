@@ -1,6 +1,6 @@
-"""MedAugment — clinically-aware medical image augmentation.
+"""MedAugmentX — clinically-aware medical image augmentation.
 
-Public surface for Phase 2.
+Public surface for Phase 3.
 """
 from medaugmentx.core import (
     Compose,
@@ -10,7 +10,7 @@ from medaugmentx.core import (
     Transform,
 )
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     "__version__",

@@ -22,6 +22,7 @@ registered before deserialisation::
     from medaugmentx.serialization import REGISTRY
     REGISTRY["MyTransform"] = MyTransform
 """
+
 from __future__ import annotations
 
 import json
@@ -221,11 +222,9 @@ def to_yaml(transform: Transform) -> str:
         ImportError: If PyYAML is not installed.
     """
     try:
-        import yaml  # type: ignore[import]
+        import yaml
     except ImportError as exc:
-        raise ImportError(
-            "YAML serialisation requires PyYAML: pip install pyyaml"
-        ) from exc
+        raise ImportError("YAML serialisation requires PyYAML: pip install pyyaml") from exc
     return yaml.dump(
         _make_serialisable(transform.to_dict()),
         default_flow_style=False,
@@ -249,11 +248,9 @@ def from_yaml(s: str) -> Transform:
         ImportError: If PyYAML is not installed.
     """
     try:
-        import yaml  # type: ignore[import]
+        import yaml
     except ImportError as exc:
-        raise ImportError(
-            "YAML deserialisation requires PyYAML: pip install pyyaml"
-        ) from exc
+        raise ImportError("YAML deserialisation requires PyYAML: pip install pyyaml") from exc
     return from_dict(yaml.safe_load(s))
 
 

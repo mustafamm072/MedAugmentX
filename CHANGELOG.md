@@ -1,11 +1,39 @@
 # Changelog
 
-All notable changes to MedAugment will be documented in this file.
+All notable changes to MedAugmentX will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.3.0] — Phase 3 Developer Interop
+
+### Added
+
+**Framework interop** (`medaugmentx.interop`)
+- `SampleTransform` — adapts any MedAugmentX transform or pipeline to
+  `MedVolume`, image arrays/tensors, `(image, mask)` tuples/lists, and
+  mapping samples.
+- `TorchTransform` — PyTorch / torchvision-friendly alias that supports torch
+  tensors at runtime without importing torch during package import.
+- `MonaiMapTransform` — MONAI-style dict adapter with `image` / `label`
+  defaults.
+- Singleton channel handling via `channel_dim`, with automatic restoration
+  after augmentation.
+- Mask/label dtype preservation by default.
+
+**Packaging**
+- Version bumped to `0.3.0`.
+- Package now includes `py.typed` for PEP 561 type-checker discovery.
+- New optional extras: `[torch]`, `[monai]`, and `[frameworks]`.
+- Added healthcare and typed-package PyPI classifiers.
+
+**Documentation**
+- Added `docs/API_REFERENCE.md` for developer-facing public API docs.
+- Updated README, API examples, architecture, milestones, and examples docs
+  for `0.3.0`.
+- Fixed stale `medaugment` import examples to use `medaugmentx`.
 
 ## [0.2.0] — Phase 2
 

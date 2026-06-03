@@ -1,4 +1,5 @@
 """Axis-aware random flipping."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
@@ -60,8 +61,9 @@ class RandomFlip(Transform):
         flips = [ax for ax in axes if self.rng.random() < self.p_per_axis]
         if not flips:
             return volume
-        new_image = np.flip(volume.image, axis=flips).copy()
-        new_mask = None if volume.mask is None else np.flip(volume.mask, axis=flips).copy()
+        flip_axes = tuple(flips)
+        new_image = np.flip(volume.image, axis=flip_axes).copy()
+        new_mask = None if volume.mask is None else np.flip(volume.mask, axis=flip_axes).copy()
         return volume.replace(image=new_image, mask=new_mask)
 
     def to_dict(self) -> dict[str, Any]:

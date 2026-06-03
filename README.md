@@ -5,7 +5,7 @@
 [![DOI](https://zenodo.org/badge/1231536084.svg)](https://doi.org/10.5281/zenodo.20191189)
 [![Python](https://img.shields.io/badge/python-3.9%20%E2%80%93%203.14-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Status: Phase 2](https://img.shields.io/badge/status-phase%202-green.svg)](docs/MILESTONES.md)
+[![Status: Phase 3](https://img.shields.io/badge/status-phase%203-blue.svg)](docs/MILESTONES.md)
 
 MedAugmentX is a purpose-built Python library for data augmentation of medical
 images. Unlike general-purpose libraries (`torchvision`, `albumentations`), it
@@ -13,8 +13,9 @@ treats the unique properties of medical data — anisotropic 3D volumes,
 modality-specific artifacts, mask consistency, and clinical I/O — as
 first-class concerns.
 
-**Zero deep-learning dependencies.** The core library requires only NumPy and
-SciPy. PyTorch, MONAI, and TorchIO interop are planned for Phase 3.
+**Zero deep-learning dependencies in the core install.** The library requires
+only NumPy and SciPy by default. PyTorch and MONAI remain optional extras,
+with lightweight dataset adapters available in `medaugmentx.interop`.
 
 ---
 
@@ -43,13 +44,18 @@ pip install "medaugmentx[io]"
 
 # With YAML serialisation support
 pip install "medaugmentx[yaml]"
+
+# Optional framework extras
+pip install "medaugmentx[torch]"      # PyTorch / torchvision tensors
+pip install "medaugmentx[monai]"      # MONAI projects
+pip install "medaugmentx[frameworks]" # PyTorch + MONAI
 ```
 
 Verify the installation:
 
 ```python
 import medaugmentx
-print(medaugmentx.__version__)   # 0.2.0
+print(medaugmentx.__version__)   # 0.3.0
 ```
 
 ---
@@ -172,6 +178,39 @@ automatically.
 
 ---
 
+## Framework interop
+
+Use `TorchTransform` when your dataset returns tensors, NumPy arrays, tuples,
+or dict samples. The adapter keeps PyTorch optional: tensors are supported at
+runtime, but importing MedAugmentX never imports torch.
+
+```python
+from medaugmentx.interop import TorchTransform
+from medaugmentx.presets import mri_pipeline
+
+augment = TorchTransform(
+    mri_pipeline(seed=None),
+    image_key="image",
+    mask_key="mask",
+    channel_dim=0,        # handles (1, D, H, W) tensors
+)
+
+sample = {"image": image_tensor, "mask": mask_tensor, "spacing": (1.0, 0.7, 0.7)}
+sample = augment(sample)
+```
+
+For MONAI-style dicts that use `label` instead of `mask`:
+
+```python
+from medaugmentx.interop import MonaiMapTransform
+
+augment = MonaiMapTransform(mri_pipeline(seed=None), image_key="image", label_key="label")
+```
+
+See [API examples](docs/API_EXAMPLES.md) and the [API reference](docs/API_REFERENCE.md).
+
+---
+
 ## What's available
 
 ### Core
@@ -235,6 +274,14 @@ automatically.
 | `load_nifti(path)` | MedVolume from `.nii` / `.nii.gz` |
 | `save_nifti(vol, path)` | Write MedVolume to NIfTI |
 
+### Interop
+
+| Adapter | Description |
+| --- | --- |
+| `SampleTransform` | Generic adapter for arrays, tensors, tuples, dicts, and `MedVolume` |
+| `TorchTransform` | PyTorch / torchvision-friendly alias for dataset samples |
+| `MonaiMapTransform` | MONAI-style dict adapter with `image` / `label` defaults |
+
 ---
 
 ## Reproducibility
@@ -256,9 +303,10 @@ assert np.array_equal(a.image, b.image)  # always passes
 | --- | --- |
 | **1 — Core MVP** | ✅ Core data model, spatial/intensity transforms, DBT, DICOM/NIfTI I/O |
 | **2 — Modality artifacts & serialisation** | ✅ MRI (bias field, ghosting, k-space), CT (beam hardening), presets, JSON/YAML |
-| **3 — GPU backend, framework interop, v1.0** | Planned |
+| **3 — Framework interop, GPU backend, v1.0** | In progress: `0.3.0` ships lightweight adapters |
 
 Detailed deliverables: [docs/MILESTONES.md](docs/MILESTONES.md).
+Developer API: [docs/API_REFERENCE.md](docs/API_REFERENCE.md).
 
 ---
 

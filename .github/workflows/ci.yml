@@ -38,7 +38,7 @@ jobs:
       - name: Type check (mypy)
         run: |
           pip install mypy
-          mypy medaugmentx --ignore-missing-imports || true
+          mypy medaugmentx --ignore-missing-imports
 
       - name: Run tests
         run: pytest --cov=medaugmentx --cov-report=xml -q

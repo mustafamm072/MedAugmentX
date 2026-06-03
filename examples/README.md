@@ -1,12 +1,18 @@
 # Examples
 
-Self-contained scripts that exercise the Phase 1 surface. Run any of them
-with `python examples/<name>.py` from the repository root.
+Self-contained scripts that exercise the public MedAugmentX surface. From a
+source checkout, install the package with `pip install -e .` or run with
+`PYTHONPATH=.`:
+
+```bash
+PYTHONPATH=. python examples/<name>.py
+```
 
 | Script | What it shows |
 | --- | --- |
-| [`quickstart.py`](quickstart.py) | The MedAugment "hello world" — build a `MedVolume`, run a mixed pipeline, inspect the result. |
-| [`dbt_pipeline.py`](dbt_pipeline.py) | The full Phase 1 tomosynthesis pipeline on a synthetic DBT slab with anisotropic spacing. |
+| [`quickstart.py`](quickstart.py) | The MedAugmentX "hello world" — build a `MedVolume`, run a mixed pipeline, inspect the result. |
+| [`dbt_pipeline.py`](dbt_pipeline.py) | The tomosynthesis pipeline on a synthetic DBT slab with anisotropic spacing. |
+| [`framework_interop.py`](framework_interop.py) | Use `TorchTransform` and `MonaiMapTransform` with dict samples. |
 | [`custom_transform.py`](custom_transform.py) | How to author your own seedable transform and drop it into `Compose`. |
 | [`load_and_augment.py`](load_and_augment.py) | Load a real NIfTI / DICOM volume from disk, augment, and write back. Requires the `io` extra. |
 

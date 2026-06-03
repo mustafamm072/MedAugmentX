@@ -9,7 +9,7 @@ paste, run.
 
 ```python
 import numpy as np
-from medaugment import MedVolume
+from medaugmentx import MedVolume
 
 vol = MedVolume(
     image=np.random.rand(80, 256, 256).astype(np.float32),  # (D, H, W)
@@ -36,7 +36,7 @@ augmented = RandomFlip(axes=("x",), p_per_axis=1.0, seed=0)(vol)
 ## 3. Compose a pipeline (deterministic seeding)
 
 ```python
-from medaugment import Compose, OneOf
+from medaugmentx import Compose, OneOf
 from medaugmentx.transforms import (
     RandomAffine, ElasticDeform,
     RicianNoise, GaussianNoise,
@@ -61,10 +61,10 @@ output on every run, on every machine.
 
 ---
 
-## 4. MRI pipeline with Phase 2 transforms
+## 4. MRI pipeline with modality transforms
 
 ```python
-from medaugment import Compose, OneOf
+from medaugmentx import Compose, OneOf
 from medaugmentx.transforms import (
     RandomAffine, ElasticDeform, RandomFlip,
     BiasField, RicianNoise, GammaCorrection,
@@ -99,7 +99,7 @@ augmented = pipeline(vol)
 ## 5. CT pipeline with window/level and beam hardening
 
 ```python
-from medaugment import Compose
+from medaugmentx import Compose
 from medaugmentx.transforms import (
     RandomAffine, ElasticDeform, RandomFlip,
     WindowLevel, GaussianNoise, GammaCorrection,
@@ -131,7 +131,7 @@ augmented = pipeline(dbt_vol)
 Or assembled manually:
 
 ```python
-from medaugment import Compose
+from medaugmentx import Compose
 from medaugmentx.transforms import (
     RandomFlip, RandomAffine, AnisotropicElastic,
     SlabShift, LimitedAngleBlur, SliceDropout,
@@ -202,29 +202,39 @@ pipeline3 = from_yaml(yaml_str)
 
 ## 9. Use with PyTorch `Dataset` / `DataLoader`
 
-PyTorch is **not** a MedAugment dependency. Wire it up in your own dataset:
+PyTorch is **not** a MedAugmentX core dependency. Wrap any MedAugmentX
+pipeline with `TorchTransform` when your dataset returns tensors, NumPy
+arrays, `(image, mask)` tuples, or dict samples:
 
 ```python
 from torch.utils.data import Dataset
+from medaugmentx.interop import TorchTransform
 from medaugmentx.io import load_nifti
 from medaugmentx.presets import mri_pipeline
 
 class MRIVolumes(Dataset):
     def __init__(self, paths):
         self.paths = paths
-        # No seed — each call to __getitem__ draws fresh augmentations.
-        # The pipeline's RNG advances independently on every call, so samples
-        # within a batch and across epochs are all different.
-        self.pipeline = mri_pipeline(seed=None)
+        pipeline = mri_pipeline(seed=None)
+        self.augment = TorchTransform(
+            pipeline,
+            image_key="image",
+            mask_key="mask",
+            channel_dim=0,      # strips/restores a singleton channel axis
+        )
 
     def __len__(self):
         return len(self.paths)
 
     def __getitem__(self, idx):
         vol = load_nifti(self.paths[idx])
-        vol = self.pipeline(vol)
-        # PyTorch wants channel-first — add a channel axis
-        return vol.image[None], (vol.mask if vol.mask is not None else 0)
+        sample = {
+            "image": vol.image[None],  # (1, D, H, W)
+            "mask": None if vol.mask is None else vol.mask[None],
+            "spacing": vol.spacing,
+            "metadata": vol.metadata,
+        }
+        return self.augment(sample)
 ```
 
 For **reproducible epochs** (same augmentations every time epoch *N* runs),
@@ -234,7 +244,7 @@ the same instance:
 ```python
 # In your training loop:
 for epoch in range(num_epochs):
-    dataset.pipeline = mri_pipeline(seed=epoch)
+    dataset.augment = TorchTransform(mri_pipeline(seed=epoch), channel_dim=0)
     # ... train ...
 ```
 
@@ -245,7 +255,32 @@ how many samples were drawn in epoch 1.
 
 ---
 
-## 10. Author your own transform
+## 10. Use with MONAI-style dictionary samples
+
+`MonaiMapTransform` defaults to `image` and `label` keys and can be used in
+MONAI-style transform pipelines without making MONAI a required dependency:
+
+```python
+from medaugmentx.interop import MonaiMapTransform
+from medaugmentx.presets import ct_pipeline
+
+augment = MonaiMapTransform(
+    ct_pipeline(seed=None),
+    image_key="image",
+    label_key="label",
+    channel_dim=0,
+)
+
+sample = {"image": image_tensor, "label": label_tensor, "spacing": (1.0, 0.7, 0.7)}
+sample = augment(sample)
+```
+
+Masks/labels preserve dtype by default. Image dtype follows the transform
+output unless you pass `preserve_image_dtype=True`.
+
+---
+
+## 11. Author your own transform
 
 ```python
 from typing import Any
@@ -281,7 +316,7 @@ Drop it into a `Compose` like any built-in transform. Always sample from
 
 ---
 
-## 11. Inspect and introspect a pipeline
+## 12. Inspect and introspect a pipeline
 
 ```python
 print(pipeline)
@@ -294,11 +329,11 @@ print(json.dumps(pipeline.to_dict(), indent=2, default=str))
 
 ---
 
-## 12. Reproducibility check
+## 13. Reproducibility check
 
 ```python
 import numpy as np
-from medaugment import Compose
+from medaugmentx import Compose
 from medaugmentx.transforms import GaussianNoise, GammaCorrection
 
 # Same instance — RNG advances each call, so output differs
