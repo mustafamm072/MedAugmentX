@@ -37,7 +37,7 @@ jobs:
 
       - name: Type check (mypy)
         run: |
-          pip install mypy
+          pip install mypy types-PyYAML
           mypy medaugmentx --ignore-missing-imports
 
       - name: Run tests
