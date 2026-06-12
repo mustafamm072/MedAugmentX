@@ -78,19 +78,22 @@ training stacks while keeping the default install lightweight.
 | 3.2 | Typed package marker for downstream type checkers | `medaugmentx/py.typed` | ✅ `0.3.0` |
 | 3.3 | Developer API reference and updated examples | `docs/API_REFERENCE.md`, `docs/API_EXAMPLES.md` | ✅ `0.3.0` |
 | 3.4 | PyTorch backend for GPU-accelerated spatial transforms | `backends/torch/` | Planned |
-| 3.5 | TorchIO subject adapter and richer MONAI integration | `interop/` | Planned |
-| 3.6 | Vendor DICOM parsers — Hologic, GE, Siemens | `io/dicom_vendor/` | Planned |
-| 3.7 | Remaining deferred transforms (motion, scatter, CLAHE, …) | `transforms/modality/` | Planned |
-| 3.8 | Benchmark suite (speed, memory, augmentation diversity) | `benchmarks/` | Planned |
-| 3.9 | Sphinx documentation site | `docs/sphinx/` | Planned |
-| 3.10 | Jupyter tutorials (MRI, CT, DBT) | `notebooks/` | Planned |
-| 3.11 | v1.0 release + GitHub Actions CD pipeline | `.github/` | Planned |
+| 3.5 | TorchIO subject adapter and richer MONAI integration | `interop/` | ✅ `0.4.0` |
+| 3.6 | Commercial adoption and security guidance | `docs/COMMERCIAL_ADOPTION.md`, `SECURITY.md` | ✅ `0.4.0` |
+| 3.7 | Vendor DICOM parsers — Hologic, GE, Siemens | `io/dicom_vendor/` | Planned |
+| 3.8 | Remaining deferred transforms (motion, scatter, CLAHE, …) | `transforms/modality/` | Planned |
+| 3.9 | Benchmark suite (speed, memory, augmentation diversity) | `benchmarks/` | Planned |
+| 3.10 | Sphinx documentation site | `docs/sphinx/` | Planned |
+| 3.11 | Jupyter tutorials (MRI, CT, DBT) | `notebooks/` | Planned |
+| 3.12 | v1.0 release + GitHub Actions CD pipeline | `.github/` | Planned |
 
 ### Acceptance criteria (Phase 3 / v1.0)
 
 - All Phase 1 and 2 deliverables shipped.
 - Default installation keeps only NumPy and SciPy as hard dependencies.
 - Framework-specific integrations are optional and import-lazy.
+- Commercial adoption docs cover intended use, dependency policy, audit
+  trails, privacy/security posture, and clinical validation expectations.
 - GPU speedup ≥ 5× vs CPU baseline for spatial transforms.
 - All transforms complete in < 500 ms on CPU for a 512×512×80 DBT volume.
 - CI/CD publishes wheels to PyPI on tag.

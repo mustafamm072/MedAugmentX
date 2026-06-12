@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] — Phase 3 TorchIO Interop
+
+### Added
+
+**Framework interop** (`medaugmentx.interop`)
+- `TorchIOTransform` — optional TorchIO `Subject` adapter for one intensity
+  image plus one optional label map.
+- Key inference for simple TorchIO subjects and explicit `image_key` /
+  `label_key` controls for multi-image studies.
+- Subject/image copy handling so the default adapter path returns augmented
+  TorchIO-like objects without mutating the caller's original object when
+  those objects provide `copy()`.
+
+**Packaging**
+- Version bumped to `0.4.0`.
+- New optional extra: `[torchio]`.
+- `[frameworks]` now installs PyTorch, MONAI, and TorchIO integrations.
+
+**Documentation**
+- Updated README, API reference, API examples, architecture, and milestones
+  for TorchIO interop.
+- Added a commercial adoption guide covering intended use, dependency policy,
+  reproducibility, audit trails, validation, and privacy expectations.
+- Added `SECURITY.md` for vulnerability reporting, PHI handling, dependency
+  posture, and clinical safety boundaries.
+- Added a docs index and tightened API example wording for accuracy.
+- Added source-distribution manifest entries and package metadata links for
+  adoption and security documentation.
+
 ## [0.3.0] — Phase 3 Developer Interop
 
 ### Added

@@ -14,8 +14,12 @@ modality-specific artifacts, mask consistency, and clinical I/O — as
 first-class concerns.
 
 **Zero deep-learning dependencies in the core install.** The library requires
-only NumPy and SciPy by default. PyTorch and MONAI remain optional extras,
-with lightweight dataset adapters available in `medaugmentx.interop`.
+only NumPy and SciPy by default. PyTorch, MONAI, and TorchIO remain optional
+extras, with lightweight dataset adapters available in `medaugmentx.interop`.
+
+MedAugmentX is intended for research and training-data augmentation workflows.
+It is not a diagnostic device, clinical decision-support system, or substitute
+for local clinical, regulatory, security, and dataset validation.
 
 ---
 
@@ -30,6 +34,27 @@ with lightweight dataset adapters available in `medaugmentx.interop`.
 | No tomosynthesis support | Dedicated DBT module with slab-aware augmentations |
 | DICOM/NIfTI I/O scattered across libraries | One loader, one `MedVolume`, vendor metadata preserved |
 | Pipelines can't be saved or reloaded | Full JSON/YAML serialisation with round-trip reconstruction |
+
+---
+
+## Commercial Readiness
+
+MedAugmentX is designed to be easy to evaluate inside serious medical AI
+teams:
+
+- **Lightweight core:** only NumPy and SciPy are required by default.
+- **Optional integrations:** PyTorch, MONAI, TorchIO, DICOM, NIfTI, and YAML
+  support stay behind extras.
+- **Reproducible pipelines:** every transform is seedable and serialisable.
+- **Mask-safe spatial ops:** image and mask geometry share the same sampled
+  transform parameters.
+- **Typed package:** ships `py.typed` for downstream type checkers.
+- **Clear adoption guidance:** see [Commercial adoption](docs/COMMERCIAL_ADOPTION.md),
+  [Documentation](docs/README.md), and [Security](SECURITY.md).
+
+Teams using MedAugmentX in regulated or customer-facing products should
+validate augmentation policies on their own data, version-control pipeline
+JSON/YAML, and document intended use before deployment.
 
 ---
 
@@ -48,14 +73,15 @@ pip install "medaugmentx[yaml]"
 # Optional framework extras
 pip install "medaugmentx[torch]"      # PyTorch / torchvision tensors
 pip install "medaugmentx[monai]"      # MONAI projects
-pip install "medaugmentx[frameworks]" # PyTorch + MONAI
+pip install "medaugmentx[torchio]"    # TorchIO subjects
+pip install "medaugmentx[frameworks]" # PyTorch + MONAI + TorchIO
 ```
 
 Verify the installation:
 
 ```python
 import medaugmentx
-print(medaugmentx.__version__)   # 0.3.0
+print(medaugmentx.__version__)   # 0.4.0
 ```
 
 ---
@@ -207,6 +233,15 @@ from medaugmentx.interop import MonaiMapTransform
 augment = MonaiMapTransform(mri_pipeline(seed=None), image_key="image", label_key="label")
 ```
 
+For TorchIO subjects:
+
+```python
+from medaugmentx.interop import TorchIOTransform
+
+augment = TorchIOTransform(mri_pipeline(seed=None), image_key="t1", label_key="seg")
+subject = augment(subject)
+```
+
 See [API examples](docs/API_EXAMPLES.md) and the [API reference](docs/API_REFERENCE.md).
 
 ---
@@ -281,6 +316,7 @@ See [API examples](docs/API_EXAMPLES.md) and the [API reference](docs/API_REFERE
 | `SampleTransform` | Generic adapter for arrays, tensors, tuples, dicts, and `MedVolume` |
 | `TorchTransform` | PyTorch / torchvision-friendly alias for dataset samples |
 | `MonaiMapTransform` | MONAI-style dict adapter with `image` / `label` defaults |
+| `TorchIOTransform` | TorchIO `Subject` adapter with optional image/label key inference |
 
 ---
 
@@ -303,7 +339,7 @@ assert np.array_equal(a.image, b.image)  # always passes
 | --- | --- |
 | **1 — Core MVP** | ✅ Core data model, spatial/intensity transforms, DBT, DICOM/NIfTI I/O |
 | **2 — Modality artifacts & serialisation** | ✅ MRI (bias field, ghosting, k-space), CT (beam hardening), presets, JSON/YAML |
-| **3 — Framework interop, GPU backend, v1.0** | In progress: `0.3.0` ships lightweight adapters |
+| **3 — Framework interop, GPU backend, v1.0** | In progress: `0.4.0` ships TorchIO interop |
 
 Detailed deliverables: [docs/MILESTONES.md](docs/MILESTONES.md).
 Developer API: [docs/API_REFERENCE.md](docs/API_REFERENCE.md).

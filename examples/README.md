@@ -12,7 +12,7 @@ PYTHONPATH=. python examples/<name>.py
 | --- | --- |
 | [`quickstart.py`](quickstart.py) | The MedAugmentX "hello world" — build a `MedVolume`, run a mixed pipeline, inspect the result. |
 | [`dbt_pipeline.py`](dbt_pipeline.py) | The tomosynthesis pipeline on a synthetic DBT slab with anisotropic spacing. |
-| [`framework_interop.py`](framework_interop.py) | Use `TorchTransform` and `MonaiMapTransform` with dict samples. |
+| [`framework_interop.py`](framework_interop.py) | Use `TorchTransform`, `MonaiMapTransform`, and `TorchIOTransform` with framework-style samples. |
 | [`custom_transform.py`](custom_transform.py) | How to author your own seedable transform and drop it into `Compose`. |
 | [`load_and_augment.py`](load_and_augment.py) | Load a real NIfTI / DICOM volume from disk, augment, and write back. Requires the `io` extra. |
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "medaugmentx"
-version = "0.3.0"
+version = "0.4.0"
 description = "Clinically-aware medical image augmentation for AI training (MRI, CT, X-Ray, Tomosynthesis)."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -60,7 +60,8 @@ test = [
 yaml = ["pyyaml>=6.0"]
 torch = ["torch>=2.0"]
 monai = ["monai>=1.3"]
-frameworks = ["torch>=2.0", "monai>=1.3"]
+torchio = ["torchio>=0.19"]
+frameworks = ["torch>=2.0", "monai>=1.3", "torchio>=0.19"]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
@@ -78,6 +79,8 @@ Homepage = "https://github.com/mustafamm072/MedAugmentX"
 Documentation = "https://github.com/mustafamm072/MedAugmentX/tree/main/docs"
 Source = "https://github.com/mustafamm072/MedAugmentX"
 Issues = "https://github.com/mustafamm072/MedAugmentX/issues"
+Security = "https://github.com/mustafamm072/MedAugmentX/blob/main/SECURITY.md"
+"Commercial Adoption" = "https://github.com/mustafamm072/MedAugmentX/blob/main/docs/COMMERCIAL_ADOPTION.md"
 
 [tool.setuptools.packages.find]
 include = ["medaugmentx*"]

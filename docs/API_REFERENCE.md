@@ -1,6 +1,6 @@
 # API Reference
 
-Version: `0.3.0`
+Version: `0.4.0`
 
 This page documents the supported public imports. Prefer these paths in
 applications, papers, tutorials, and commercial code; internal module paths may
@@ -155,7 +155,12 @@ Custom transform classes can be registered with
 ## Framework Interop
 
 ```python
-from medaugmentx.interop import SampleTransform, TorchTransform, MonaiMapTransform
+from medaugmentx.interop import (
+    SampleTransform,
+    TorchTransform,
+    MonaiMapTransform,
+    TorchIOTransform,
+)
 ```
 
 ### `SampleTransform`
@@ -209,6 +214,32 @@ MonaiMapTransform(
 
 Dictionary adapter with MONAI-style `image` / `label` defaults.
 
+### `TorchIOTransform`
+
+```python
+TorchIOTransform(
+    transform,
+    image_key="image",
+    label_key="label",
+    channel_dim=0,
+    preserve_image_dtype=False,
+    preserve_label_dtype=True,
+    copy=True,
+)
+```
+
+TorchIO `Subject` adapter. It reads one intensity image and one optional label
+map from image-like objects with `.data`, runs the MedAugmentX transform, and
+writes augmented data back to the returned subject.
+
+`image_key` and `label_key` may be explicit strings. If `image_key` is absent
+from the subject, the adapter infers a unique non-label image key. If
+`label_key` is absent, it infers a unique label-like key when present. Pass
+explicit keys for multi-image subjects.
+
+Importing `TorchIOTransform` does not import TorchIO; install TorchIO only
+when your pipeline needs it with `pip install "medaugmentx[torchio]"`.
+
 ---
 
 ## I/O
@@ -237,4 +268,15 @@ Install optional I/O support with `pip install "medaugmentx[io]"`.
 | `yaml` | `pyyaml` |
 | `torch` | `torch` |
 | `monai` | `monai` |
-| `frameworks` | `torch`, `monai` |
+| `torchio` | `torchio` |
+| `frameworks` | `torch`, `monai`, `torchio` |
+
+---
+
+## Operational Docs
+
+| Document | Use |
+| --- | --- |
+| [Commercial adoption](COMMERCIAL_ADOPTION.md) | Intended use, validation, audit trail, privacy, and dependency guidance |
+| [Architecture](ARCHITECTURE.md) | Layering, public surface, contracts, and dependency boundaries |
+| [Security policy](../SECURITY.md) | Vulnerability reporting, PHI handling, supported versions, and dependency posture |

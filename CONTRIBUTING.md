@@ -49,6 +49,11 @@ examples/                   # Runnable scripts
   deterministic.
 - **No prints, no globals.** Use `logging` if you really need diagnostics.
 - **Style.** `ruff check` and `ruff format` should pass. CI enforces this.
+- **Clinical boundaries.** Do not imply diagnostic, treatment, regulatory, or
+  clinical decision-support claims in docs, examples, or code comments.
+- **Privacy by default.** Examples must use synthetic data or clearly
+  de-identified local paths. Do not commit patient identifiers, full DICOM
+  headers, access tokens, or private dataset details.
 
 ## Adding a new transform
 
@@ -148,6 +153,12 @@ Please include:
 - a minimal `MedVolume` (shape, dtype, spacing) that reproduces the issue,
 - the full traceback,
 - modality and, if known, the originating scanner vendor.
+
+## Reporting security issues
+
+Please do not open public issues for suspected vulnerabilities or accidental
+exposure of private medical data. Follow [SECURITY.md](SECURITY.md) and share
+only the minimum reproduction needed for maintainers to investigate safely.
 
 ## Code of conduct
 

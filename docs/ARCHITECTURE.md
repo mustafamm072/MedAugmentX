@@ -7,7 +7,7 @@ layout and the rules each layer follows.
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │ Interop  (medaugmentx/interop/)                                  │
-│   SampleTransform · TorchTransform · MonaiMapTransform           │
+│   SampleTransform · TorchTransform · MonaiMapTransform · TorchIO │
 ├─────────────────────────────────────────────────────────────────┤
 │ Presets  (medaugmentx/presets.py)                                │
 │   mri_pipeline · ct_pipeline · dxr_pipeline · dbt_pipeline     │
@@ -30,7 +30,7 @@ layout and the rules each layer follows.
             numpy + scipy (always present)
             pydicom + nibabel (optional, behind extras)
             pyyaml (optional, behind [yaml] extra)
-            torch + monai (optional, behind framework extras)
+            torch + monai + torchio (optional, behind framework extras)
 ```
 
 ---
@@ -197,17 +197,19 @@ All presets are serialisable via `to_json` / `to_yaml`.
 
 Framework adapters sit above the core transform API. They make the library
 usable in PyTorch, torchvision, and MONAI-style training code without making
-those frameworks hard dependencies.
+those frameworks hard dependencies. TorchIO subjects are supported through the
+same import-lazy adapter layer.
 
 | Adapter | Purpose |
 | --- | --- |
 | `SampleTransform` | Generic adapter for `MedVolume`, arrays/tensors, `(image, mask)`, and dict samples |
 | `TorchTransform` | PyTorch / torchvision-friendly alias of `SampleTransform` |
 | `MonaiMapTransform` | Dict adapter with `image` / `label` defaults |
+| `TorchIOTransform` | TorchIO `Subject` adapter for one image plus one optional label map |
 
-Import rule: `medaugmentx.interop` must not import PyTorch or MONAI
-at module import time. Tensor support is duck-typed and restores torch tensors
-only when a torch tensor is actually passed.
+Import rule: `medaugmentx.interop` must not import PyTorch, MONAI, or TorchIO
+at module import time. Tensor and subject support is duck-typed and restores
+framework objects only when those objects are actually passed.
 
 Channel rule: MedAugmentX transforms operate on single-channel 2D/3D images.
 Adapters may strip one singleton channel axis before augmentation and restore
@@ -242,14 +244,33 @@ applies `RescaleSlope * pixels + RescaleIntercept`, and reads spacing from
 | Transforms | `scipy` | — |
 | Serialisation | — | `pyyaml` (YAML only; JSON uses stdlib) |
 | I/O | — | `pydicom`, `nibabel` |
-| Interop | — | `torch`, `monai` |
+| Interop | — | `torch`, `monai`, `torchio` |
 
 Phase 3 framework support stays behind extras so installing MedAugmentX never
 pulls in a deep-learning framework by default.
 
 ---
 
-## 8. Testing strategy
+## 8. Commercial adoption posture
+
+MedAugmentX is intentionally local, serialisable, and dependency-light:
+
+- no runtime network access,
+- no telemetry,
+- optional I/O and framework integrations,
+- JSON/YAML pipeline configs for audit trails,
+- typed public package surface through `py.typed`,
+- stable axis and mask-consistency contracts.
+
+The library is intended for medical AI training and evaluation workflows. It is
+not a diagnostic device, clinical decision-support system, or substitute for
+local clinical, security, privacy, and regulatory validation. See
+[COMMERCIAL_ADOPTION.md](COMMERCIAL_ADOPTION.md) and
+[SECURITY.md](../SECURITY.md).
+
+---
+
+## 9. Testing strategy
 
 - **Unit tests** for every transform — output shape, dtype, value range,
   reproducibility under a fixed seed, `p=0` boundary, mask untouched.
@@ -268,7 +289,7 @@ pulls in a deep-learning framework by default.
 
 ---
 
-## 9. Public surface
+## 10. Public surface
 
 The flat re-export in `medaugmentx/transforms/__init__.py` is the canonical
 import path. Internal modules (`medaugmentx/transforms/intensity/bias_field.py`,

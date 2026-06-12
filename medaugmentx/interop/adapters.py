@@ -1,7 +1,8 @@
-"""Lightweight adapters for PyTorch, torchvision, and MONAI-style samples."""
+"""Lightweight adapters for PyTorch, torchvision, MONAI, and TorchIO samples."""
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Literal, Union
@@ -294,4 +295,233 @@ class MonaiMapTransform(SampleTransform):
             channel_dim=channel_dim,
             preserve_image_dtype=preserve_image_dtype,
             preserve_mask_dtype=preserve_label_dtype,
+        )
+
+
+def _looks_like_torchio_image(value: Any) -> bool:
+    return hasattr(value, "data") and (
+        hasattr(value, "set_data") or type(value).__module__.startswith("torchio")
+    )
+
+
+def _looks_like_torchio_subject(value: Any) -> bool:
+    if _looks_like_torchio_image(value):
+        return False
+    if not hasattr(value, "keys"):
+        return False
+    for key in _subject_keys(value):
+        try:
+            if _looks_like_torchio_image(_subject_get(value, key)):
+                return True
+        except (KeyError, TypeError):
+            continue
+    return False
+
+
+def _is_torchio_label(value: Any, key: str | None = None) -> bool:
+    name = type(value).__name__.lower()
+    key_text = "" if key is None else key.lower()
+    return "label" in name or "label" in key_text or "mask" in key_text or "seg" in key_text
+
+
+def _subject_keys(subject: Any) -> list[str]:
+    if hasattr(subject, "keys"):
+        return [str(k) for k in subject.keys()]
+    raise TypeError(
+        "TorchIOTransform expects a TorchIO Subject-like mapping or an Image-like object "
+        "with a .data attribute"
+    )
+
+
+def _subject_contains(subject: Any, key: str) -> bool:
+    try:
+        return key in subject
+    except TypeError:
+        return False
+
+
+def _subject_get(subject: Any, key: str) -> Any:
+    try:
+        return subject[key]
+    except KeyError:
+        raise
+    except TypeError as exc:
+        raise TypeError("TorchIO Subject-like objects must support item access") from exc
+
+
+def _subject_set(subject: Any, key: str, value: Any) -> None:
+    try:
+        subject[key] = value
+    except TypeError as exc:
+        raise TypeError("TorchIO Subject-like objects must support item assignment") from exc
+
+
+def _copy_if_possible(value: Any) -> Any:
+    try:
+        return copy.copy(value)
+    except Exception:
+        copy_method = getattr(value, "copy", None)
+        if callable(copy_method):
+            return copy_method()
+    return value
+
+
+def _set_torchio_data(image: Any, data: Any) -> None:
+    set_data = getattr(image, "set_data", None)
+    if callable(set_data):
+        set_data(data)
+        return
+    try:
+        image.data = data
+    except AttributeError as exc:
+        raise TypeError("TorchIO image-like objects must expose set_data(data) or writable data") from exc
+
+
+class TorchIOTransform(SampleTransform):
+    """TorchIO ``Subject`` adapter for MedAugmentX transforms.
+
+    TorchIO remains an optional dependency. This adapter is duck-typed: it
+    looks for Subject-like mappings whose values expose ``.data`` and
+    ``set_data(data)``. The image and optional label tensor are converted
+    through :class:`MedVolume`, augmented together, then written back to the
+    same Image objects in the returned subject.
+
+    The adapter handles one intensity image plus one optional label map. Pass
+    explicit keys for multi-image subjects.
+    """
+
+    def __init__(
+        self,
+        transform: Transform,
+        *,
+        image_key: str | None = "image",
+        label_key: str | None = "label",
+        channel_dim: ChannelDim = 0,
+        preserve_image_dtype: bool = False,
+        preserve_label_dtype: bool = True,
+        copy: bool = True,
+    ) -> None:
+        super().__init__(
+            transform,
+            image_key="image" if image_key is None else image_key,
+            mask_key=label_key,
+            channel_dim=channel_dim,
+            preserve_image_dtype=preserve_image_dtype,
+            preserve_mask_dtype=preserve_label_dtype,
+        )
+        self.torchio_image_key = image_key
+        self.torchio_label_key = label_key
+        self.copy = bool(copy)
+
+    def __call__(self, sample: Any) -> Any:
+        if _looks_like_torchio_image(sample):
+            image = _copy_if_possible(sample) if self.copy else sample
+            out_image, _ = self._augment(
+                image=image.data,
+                mask=None,
+                spacing=self._spacing_from_image(image),
+                metadata=self._metadata_from_image(image, image_key=None),
+            )
+            _set_torchio_data(image, out_image)
+            return image
+        if _looks_like_torchio_subject(sample):
+            return self._call_subject(sample)
+        return super().__call__(sample)
+
+    def _call_subject(self, subject: Any) -> Any:
+        out = _copy_if_possible(subject) if self.copy else subject
+        image_key = self._resolve_image_key(out)
+        label_key = self._resolve_label_key(out, image_key)
+
+        image_obj = _subject_get(out, image_key)
+        label_obj = None if label_key is None else _subject_get(out, label_key)
+
+        if self.copy:
+            image_obj = _copy_if_possible(image_obj)
+            _subject_set(out, image_key, image_obj)
+            if label_key is not None and label_obj is not None:
+                label_obj = _copy_if_possible(label_obj)
+                _subject_set(out, label_key, label_obj)
+
+        out_image, out_label = self._augment(
+            image=image_obj.data,
+            mask=None if label_obj is None else label_obj.data,
+            spacing=self._spacing_from_image(image_obj, fallback_subject=out),
+            metadata=self._metadata_from_image(image_obj, image_key=image_key),
+        )
+        _set_torchio_data(image_obj, out_image)
+        if label_obj is not None and out_label is not None:
+            _set_torchio_data(label_obj, out_label)
+        return out
+
+    def _resolve_image_key(self, subject: Any) -> str:
+        preferred = self.torchio_image_key
+        if preferred is not None and _subject_contains(subject, preferred):
+            value = _subject_get(subject, preferred)
+            if not _looks_like_torchio_image(value):
+                raise TypeError(f"image_key={preferred!r} does not point to a TorchIO image")
+            return preferred
+
+        candidates = [
+            key
+            for key in _subject_keys(subject)
+            if _looks_like_torchio_image(_subject_get(subject, key))
+            and not _is_torchio_label(_subject_get(subject, key), key)
+        ]
+        if len(candidates) == 1:
+            return candidates[0]
+        if not candidates:
+            raise KeyError("Could not infer a TorchIO intensity image key")
+        raise KeyError(
+            "Could not infer a unique TorchIO intensity image key; pass image_key explicitly"
+        )
+
+    def _resolve_label_key(self, subject: Any, image_key: str) -> str | None:
+        preferred = self.torchio_label_key
+        if preferred is None:
+            return None
+        if _subject_contains(subject, preferred):
+            value = _subject_get(subject, preferred)
+            if not _looks_like_torchio_image(value):
+                raise TypeError(f"label_key={preferred!r} does not point to a TorchIO image")
+            return preferred
+
+        candidates = [
+            key
+            for key in _subject_keys(subject)
+            if key != image_key
+            and _looks_like_torchio_image(_subject_get(subject, key))
+            and _is_torchio_label(_subject_get(subject, key), key)
+        ]
+        if len(candidates) == 1:
+            return candidates[0]
+        return None
+
+    @staticmethod
+    def _spacing_from_image(
+        image: Any,
+        fallback_subject: Any | None = None,
+    ) -> tuple[float, ...] | None:
+        spacing = getattr(image, "spacing", None)
+        if spacing is None and fallback_subject is not None:
+            spacing = getattr(fallback_subject, "spacing", None)
+        if spacing is None:
+            return None
+        return tuple(float(s) for s in spacing)
+
+    @staticmethod
+    def _metadata_from_image(image: Any, image_key: str | None) -> dict[str, Any]:
+        metadata: dict[str, Any] = {}
+        affine = getattr(image, "affine", None)
+        if affine is not None:
+            metadata["affine"] = affine
+        if image_key is not None:
+            metadata["torchio_image_key"] = image_key
+        return metadata
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}(transform={self.transform!r}, "
+            f"image_key={self.torchio_image_key!r}, label_key={self.torchio_label_key!r}, "
+            f"channel_dim={self.channel_dim!r})"
         )

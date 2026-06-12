@@ -1,7 +1,8 @@
 # API Examples
 
-Working code for common use-cases. Every snippet is self-contained — copy,
-paste, run.
+Working patterns for common use-cases. Snippets that use real DICOM, NIfTI,
+TorchIO, or training data paths are intentionally minimal; replace paths and
+dataset objects with your own local data.
 
 ---
 
@@ -156,11 +157,12 @@ pipeline = Compose([
 
 ```python
 from medaugmentx.io import load_dicom_series, load_nifti, save_nifti
+from medaugmentx.presets import ct_pipeline
 
 vol_ct  = load_dicom_series("/data/studies/12345/CT_chest/")  # MedVolume
 vol_mri = load_nifti("brain_t1.nii.gz")                        # MedVolume
 
-augmented = ct_pipeline(vol_ct)
+augmented = ct_pipeline(seed=0)(vol_ct)
 save_nifti(augmented, "ct_augmented.nii.gz")
 ```
 
@@ -189,7 +191,7 @@ pipeline2 = from_json(open("mri_pipeline.json").read())
 out = pipeline2(vol)
 ```
 
-Optional YAML round-trip (requires `pip install pyyaml`):
+Optional YAML round-trip (requires `pip install "medaugmentx[yaml]"`):
 
 ```python
 from medaugmentx.serialization import to_yaml, from_yaml
@@ -280,7 +282,39 @@ output unless you pass `preserve_image_dtype=True`.
 
 ---
 
-## 11. Author your own transform
+## 11. Use with TorchIO subjects
+
+TorchIO is optional. `TorchIOTransform` uses duck typing, so importing the
+adapter does not import TorchIO until your own code creates TorchIO objects:
+
+```python
+import torchio as tio
+from medaugmentx.interop import TorchIOTransform
+from medaugmentx.presets import mri_pipeline
+
+subject = tio.Subject(
+    t1=tio.ScalarImage("t1.nii.gz"),
+    seg=tio.LabelMap("seg.nii.gz"),
+)
+
+augment = TorchIOTransform(
+    mri_pipeline(seed=None),
+    image_key="t1",
+    label_key="seg",
+    channel_dim=0,      # TorchIO data is channel-first
+)
+
+subject = augment(subject)
+```
+
+If a subject has exactly one scalar-like image and one label-like image, the
+keys can be inferred. Pass explicit keys for multi-contrast studies.
+
+> Requires the `torchio` extra: `pip install "medaugmentx[torchio]"`
+
+---
+
+## 12. Author your own transform
 
 ```python
 from typing import Any
@@ -316,7 +350,7 @@ Drop it into a `Compose` like any built-in transform. Always sample from
 
 ---
 
-## 12. Inspect and introspect a pipeline
+## 13. Inspect and introspect a pipeline
 
 ```python
 print(pipeline)
@@ -329,7 +363,7 @@ print(json.dumps(pipeline.to_dict(), indent=2, default=str))
 
 ---
 
-## 13. Reproducibility check
+## 14. Reproducibility check
 
 ```python
 import numpy as np
