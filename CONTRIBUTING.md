@@ -92,13 +92,20 @@ class MyTransform(Transform):
 
 `to_dict()` is required for JSON/YAML serialisation. The `"params"` values
 must be valid `__init__` keyword arguments so `from_dict()` can reconstruct
-the transform. Register the class in `REGISTRY` if users will serialise
-pipelines that include it:
+the transform. Register the class with `@register_transform` if users will
+serialise pipelines that include it:
 
 ```python
-from medaugmentx.serialization import REGISTRY
-REGISTRY["MyTransform"] = MyTransform
+from medaugmentx.serialization import register_transform
+
+@register_transform
+class MyTransform(Transform):
+    ...
 ```
+
+The decorator validates the class and refuses to overwrite an existing name
+(pass `override=True` to replace one deliberately). Direct assignment
+(`REGISTRY["MyTransform"] = MyTransform`) still works.
 
 Built-in transforms are registered automatically in `serialization.py`.
 

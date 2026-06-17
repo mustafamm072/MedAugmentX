@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-06-15
+
+### Added
+
+- `medaugmentx.serialization.register_transform` — a decorator for registering
+  custom transforms for JSON/YAML round-trips. Validates that the class is a
+  `Transform` subclass and refuses to silently overwrite an existing registry
+  entry (e.g. a built-in) unless `override=True` is passed. Usable bare
+  (`@register_transform`) or parametrised (`@register_transform(name=...,
+  override=...)`). Direct assignment to `REGISTRY` continues to work for
+  backward compatibility.
+
+### Changed
+
+- Documentation and the `custom_transform` example now recommend
+  `@register_transform` over manual `REGISTRY` mutation for custom transforms.
+
 ## [0.4.0] — Phase 3 TorchIO Interop
 
 ### Added

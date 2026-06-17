@@ -4,7 +4,7 @@ The contract:
   1. Subclass Transform, override apply().
   2. Always sample from self.rng (never numpy.random) so deterministic seeding works.
   3. Override to_dict() so the transform can be serialised and reloaded.
-  4. Register the class in REGISTRY if you want JSON/YAML round-trips.
+  4. Decorate with @register_transform if you want JSON/YAML round-trips.
 
 Run with:
 
@@ -18,10 +18,13 @@ import numpy as np
 
 from medaugmentx import Compose, MedVolume
 from medaugmentx.core import Transform
-from medaugmentx.serialization import REGISTRY, from_json, to_json
+from medaugmentx.serialization import from_json, register_transform, to_json
 from medaugmentx.transforms import GaussianNoise
 
 
+# Register so to_json / from_json can reconstruct this transform. The decorator
+# validates the class and refuses to silently overwrite a built-in name.
+@register_transform
 class IntensityShift(Transform):
     """Add a uniform random offset to all voxels."""
 
@@ -38,10 +41,6 @@ class IntensityShift(Transform):
             "name": self.__class__.__name__,
             "params": {"max_shift": self.max_shift, "p": self.p},
         }
-
-
-# Register so to_json / from_json can reconstruct this transform.
-REGISTRY["IntensityShift"] = IntensityShift
 
 
 def main() -> None:

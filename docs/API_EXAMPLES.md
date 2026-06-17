@@ -319,7 +319,9 @@ keys can be inferred. Pass explicit keys for multi-contrast studies.
 ```python
 from typing import Any
 from medaugmentx.core import Transform, MedVolume
+from medaugmentx.serialization import register_transform
 
+@register_transform   # registers it for JSON/YAML serialisation
 class IntensityShift(Transform):
     """Add a uniform random offset to all voxels."""
 
@@ -338,12 +340,9 @@ class IntensityShift(Transform):
         }
 ```
 
-Register it for serialisation if needed:
-
-```python
-from medaugmentx.serialization import REGISTRY
-REGISTRY["IntensityShift"] = IntensityShift
-```
+The `@register_transform` decorator validates the class and refuses to silently
+overwrite an existing registry entry. Direct assignment,
+`REGISTRY["IntensityShift"] = IntensityShift`, also works.
 
 Drop it into a `Compose` like any built-in transform. Always sample from
 `self.rng`, never from `np.random` — see [ARCHITECTURE.md](ARCHITECTURE.md).

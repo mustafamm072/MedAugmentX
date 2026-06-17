@@ -5,7 +5,14 @@ import numpy as np
 import pytest
 
 from medaugmentx import Compose, MedVolume, OneOf, SomeOf
-from medaugmentx.serialization import REGISTRY, from_dict, from_json, to_json
+from medaugmentx.core import Transform
+from medaugmentx.serialization import (
+    REGISTRY,
+    from_dict,
+    from_json,
+    register_transform,
+    to_json,
+)
 from medaugmentx.transforms import (
     AnatomicCrop,
     AnisotropicElastic,
@@ -191,3 +198,82 @@ def test_from_json_reconstructs_compose_pipeline():
     rt = from_json(s)
     assert isinstance(rt, Compose)
     assert len(rt.transforms) == 2
+
+
+# ---------------------------------------------------------------------------
+# register_transform decorator
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def clean_registry():
+    """Snapshot and restore REGISTRY so custom registrations don't leak."""
+    snapshot = dict(REGISTRY)
+    try:
+        yield
+    finally:
+        REGISTRY.clear()
+        REGISTRY.update(snapshot)
+
+
+def _make_shift_cls(name="_TestShift"):
+    class _Shift(Transform):
+        def __init__(self, delta=0.1, p=1.0, seed=None):
+            super().__init__(p=p, seed=seed)
+            self.delta = float(delta)
+
+        def apply(self, volume):
+            return volume.replace(image=volume.image + self.delta)
+
+        def to_dict(self):
+            return {"name": name, "params": {"delta": self.delta, "p": self.p}}
+
+    _Shift.__name__ = name
+    return _Shift
+
+
+def test_register_transform_bare(clean_registry):
+    cls = _make_shift_cls("_BareShift")
+    returned = register_transform(cls)
+    assert returned is cls
+    assert REGISTRY["_BareShift"] is cls
+
+
+def test_register_transform_round_trips_in_pipeline(clean_registry, vol2d):
+    cls = _make_shift_cls("_RoundTripShift")
+    register_transform(cls)
+    pipeline = Compose([cls(delta=0.25), GaussianNoise(std=0.01)], seed=3)
+    rt = round_trip(pipeline)
+    assert isinstance(rt.transforms[0], cls)
+    assert rt.transforms[0].delta == 0.25
+
+
+def test_register_transform_with_name(clean_registry):
+    cls = _make_shift_cls("_LegacyName")
+    register_transform(name="_LegacyName")(cls)
+    assert REGISTRY["_LegacyName"] is cls
+
+
+def test_register_transform_rejects_non_transform(clean_registry):
+    with pytest.raises(TypeError, match="Transform subclass"):
+        register_transform(int)
+
+
+def test_register_transform_rejects_duplicate(clean_registry):
+    with pytest.raises(KeyError, match="already registered"):
+        register_transform(name="GaussianNoise")(_make_shift_cls("X"))
+
+
+def test_register_transform_reregister_same_class_is_idempotent(clean_registry):
+    cls = _make_shift_cls("_Idem")
+    register_transform(cls)
+    # Registering the exact same class again must not raise.
+    assert register_transform(cls) is cls
+
+
+def test_register_transform_override_replaces_entry(clean_registry):
+    first = _make_shift_cls("_Dup")
+    second = _make_shift_cls("_Dup")
+    register_transform(first)
+    register_transform(name="_Dup", override=True)(second)
+    assert REGISTRY["_Dup"] is second

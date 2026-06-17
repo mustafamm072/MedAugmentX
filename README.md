@@ -81,7 +81,7 @@ Verify the installation:
 
 ```python
 import medaugmentx
-print(medaugmentx.__version__)   # 0.4.0
+print(medaugmentx.__version__)   # 0.5.0
 ```
 
 ---
@@ -176,12 +176,20 @@ pipeline2 = from_json(open("pipeline.json").read())
 out = pipeline2(vol)
 ```
 
-Custom transforms can be added to the registry so they serialise too:
+Custom transforms can be registered so they serialise too. The
+`@register_transform` decorator validates the class and refuses to silently
+shadow a built-in name:
 
 ```python
-from medaugmentx.serialization import REGISTRY
-REGISTRY["MyTransform"] = MyTransform
+from medaugmentx.core import Transform
+from medaugmentx.serialization import register_transform
+
+@register_transform
+class MyTransform(Transform):
+    ...
 ```
+
+Direct assignment (`REGISTRY["MyTransform"] = MyTransform`) still works.
 
 ---
 
@@ -339,7 +347,7 @@ assert np.array_equal(a.image, b.image)  # always passes
 | --- | --- |
 | **1 — Core MVP** | ✅ Core data model, spatial/intensity transforms, DBT, DICOM/NIfTI I/O |
 | **2 — Modality artifacts & serialisation** | ✅ MRI (bias field, ghosting, k-space), CT (beam hardening), presets, JSON/YAML |
-| **3 — Framework interop, GPU backend, v1.0** | In progress: `0.4.0` ships TorchIO interop |
+| **3 — Framework interop, GPU backend, v1.0** | In progress: `0.5.0` adds custom-transform registration; `0.4.0` shipped TorchIO interop |
 
 Detailed deliverables: [docs/MILESTONES.md](docs/MILESTONES.md).
 Developer API: [docs/API_REFERENCE.md](docs/API_REFERENCE.md).

@@ -17,19 +17,30 @@ use only the Python standard library.
 Registry
 --------
 :data:`REGISTRY` maps class names to classes.  Custom transforms must be
-registered before deserialisation::
+registered before deserialisation.  The recommended way is the
+:func:`register_transform` decorator, which validates the class and guards
+against silently clobbering a built-in::
 
-    from medaugmentx.serialization import REGISTRY
-    REGISTRY["MyTransform"] = MyTransform
+    from medaugmentx.core import Transform
+    from medaugmentx.serialization import register_transform
+
+    @register_transform
+    class MyTransform(Transform):
+        ...
+
+Direct assignment (``REGISTRY["MyTransform"] = MyTransform``) still works for
+backward compatibility.
 """
 
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable, TypeVar, overload
 
 if TYPE_CHECKING:
     from medaugmentx.core.base import Transform
+
+    T = TypeVar("T", bound=type[Transform])
 
 # ---------------------------------------------------------------------------
 # Registry — populated below with all built-in transforms
@@ -108,6 +119,83 @@ def _register_builtins() -> None:
 
 
 _register_builtins()
+
+
+# ---------------------------------------------------------------------------
+# register_transform — decorator for custom transforms
+# ---------------------------------------------------------------------------
+
+
+@overload
+def register_transform(cls: T) -> T: ...
+@overload
+def register_transform(
+    cls: None = ..., *, name: str | None = ..., override: bool = ...
+) -> Callable[[T], T]: ...
+
+
+def register_transform(
+    cls: type | None = None,
+    *,
+    name: str | None = None,
+    override: bool = False,
+) -> Any:
+    """Register a custom :class:`~medaugmentx.core.base.Transform` for serialisation.
+
+    Usable bare or with arguments::
+
+        @register_transform
+        class MyTransform(Transform): ...
+
+        @register_transform(name="LegacyName")
+        class MyTransform(Transform): ...
+
+    The class is added to :data:`REGISTRY` under ``name`` (defaulting to the
+    class's own ``__name__``) and returned unchanged, so it can be used as a
+    decorator. To round-trip cleanly the class must implement ``to_dict`` and
+    accept its ``to_dict`` ``params`` back through ``__init__``.
+
+    Args:
+        cls: The transform class (supplied automatically when used bare).
+        name: Registry key. Defaults to ``cls.__name__``. Must match the
+            ``"name"`` field the class emits from ``to_dict`` for round-trips
+            to work.
+        override: Allow replacing an existing registry entry. Defaults to
+            ``False`` so a name collision with a built-in (or another custom
+            transform) raises instead of silently shadowing it.
+
+    Returns:
+        The class itself (bare form) or a decorator (parametrised form).
+
+    Raises:
+        TypeError: If ``cls`` is not a subclass of ``Transform``.
+        KeyError: If ``name`` is already registered to a *different* class and
+            ``override`` is ``False``.
+    """
+    # Import here to avoid a circular import at module load time.
+    from medaugmentx.core.base import Transform
+
+    def _decorate(klass: type) -> type:
+        if not (isinstance(klass, type) and issubclass(klass, Transform)):
+            raise TypeError(
+                f"register_transform expects a Transform subclass, got {klass!r}"
+            )
+        key = name if name is not None else klass.__name__
+        existing = REGISTRY.get(key)
+        if existing is not None and existing is not klass and not override:
+            raise KeyError(
+                f"Transform name {key!r} is already registered to "
+                f"{existing.__name__!r}. Pass override=True to replace it, or "
+                f"choose a different name."
+            )
+        REGISTRY[key] = klass
+        return klass
+
+    # Bare usage: @register_transform
+    if cls is not None:
+        return _decorate(cls)
+    # Parametrised usage: @register_transform(name=..., override=...)
+    return _decorate
 
 
 # ---------------------------------------------------------------------------
@@ -256,6 +344,7 @@ def from_yaml(s: str) -> Transform:
 
 __all__ = [
     "REGISTRY",
+    "register_transform",
     "from_dict",
     "to_json",
     "from_json",

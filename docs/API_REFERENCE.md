@@ -1,6 +1,6 @@
 # API Reference
 
-Version: `0.4.0`
+Version: `0.5.0`
 
 This page documents the supported public imports. Prefer these paths in
 applications, papers, tutorials, and commercial code; internal module paths may
@@ -141,14 +141,16 @@ from medaugmentx.serialization import REGISTRY, from_dict, to_json, from_json, t
 | API | Description |
 | --- | --- |
 | `REGISTRY` | Maps transform class names to classes |
+| `register_transform(cls=None, *, name=None, override=False)` | Decorator that registers a custom transform class |
 | `from_dict(d)` | Reconstruct a transform from `transform.to_dict()` |
 | `to_json(transform, indent=2)` | Serialise a transform or pipeline to JSON |
 | `from_json(s)` | Reconstruct from JSON |
 | `to_yaml(transform)` | Serialise to YAML; requires `pyyaml` |
 | `from_yaml(s)` | Reconstruct from YAML; requires `pyyaml` |
 
-Custom transform classes can be registered with
-`REGISTRY["MyTransform"] = MyTransform`.
+Custom transform classes can be registered with the `@register_transform`
+decorator (which validates the class and guards against name collisions) or by
+direct assignment, `REGISTRY["MyTransform"] = MyTransform`.
 
 ---
 

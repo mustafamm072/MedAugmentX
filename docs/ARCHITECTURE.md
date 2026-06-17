@@ -162,11 +162,16 @@ pipeline  ──to_yaml()──►  YAML string  ──from_yaml()──►  pip
 ```
 
 **`REGISTRY`** maps class names to classes. All 22 built-in transforms are
-registered at import time. Custom transforms can be added:
+registered at import time. Custom transforms can be added with the
+`@register_transform` decorator (validates the class and prevents accidental
+name collisions) or by direct assignment:
 
 ```python
-from medaugmentx.serialization import REGISTRY
-REGISTRY["MyTransform"] = MyTransform
+from medaugmentx.serialization import register_transform
+
+@register_transform
+class MyTransform(Transform):
+    ...
 ```
 
 **`from_dict(d)`** reconstructs any transform from its dict form.
