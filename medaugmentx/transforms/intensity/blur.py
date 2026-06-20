@@ -4,13 +4,14 @@ from __future__ import annotations
 from typing import Any, Union
 
 import numpy as np
-from scipy.ndimage import gaussian_filter, zoom
+from scipy.ndimage import gaussian_filter, median_filter, zoom
 
 from medaugmentx.core.base import Transform
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
 
 Range = Union[float, tuple[float, float]]
+IntRange = Union[int, tuple[int, int]]
 
 
 class GaussianBlur(Transform):
@@ -160,6 +161,71 @@ class SimulateLowResolution(Transform):
                 "order_down": self.order_down,
                 "order_up": self.order_up,
                 "per_axis": self.per_axis,
+                "p": self.p,
+            },
+        }
+
+
+class MedianBlur(Transform):
+    """Median filter — edge-preserving smoothing, strong against salt-and-pepper.
+
+    Unlike :class:`GaussianBlur`, the median filter removes impulse noise
+    (hot/dead detector pixels, speckle) while keeping edges crisp.  The
+    window is a cube of side ``ksize`` voxels applied across all axes.
+
+    .. note::
+        A 3-D median filter is a cubic-window rank filter and is intrinsically
+        expensive on large volumes.  Prefer a small ``ksize`` (3) and/or a
+        modest ``p`` on full-resolution 3-D data — see ``benchmarks/``.
+
+    The mask is never modified.
+
+    Args:
+        ksize: Window side length in voxels.  Must be a **positive odd**
+            integer, or a ``(low, high)`` inclusive range of odd integers
+            sampled per call.
+        mode: Boundary mode for :func:`scipy.ndimage.median_filter`.
+        p: Probability of applying.
+        seed: RNG seed.
+    """
+
+    def __init__(
+        self,
+        ksize: IntRange = 3,
+        mode: str = "reflect",
+        p: float = 1.0,
+        seed: SeedLike = None,
+    ) -> None:
+        super().__init__(p=p, seed=seed)
+        if isinstance(ksize, int):
+            lo = hi = int(ksize)
+        else:
+            lo, hi = int(ksize[0]), int(ksize[1])
+        if lo < 1 or hi < lo:
+            raise ValueError(f"ksize range invalid: {ksize}")
+        if lo % 2 == 0 or hi % 2 == 0:
+            raise ValueError(f"ksize bounds must be odd, got {ksize}")
+        self.ksize_range: tuple[int, int] = (lo, hi)
+        self.mode = mode
+
+    def apply(self, volume: MedVolume) -> MedVolume:
+        lo, hi = self.ksize_range
+        # Sample among the odd values in [lo, hi].
+        odd_choices = list(range(lo, hi + 1, 2))
+        k = int(odd_choices[int(self.rng.integers(0, len(odd_choices)))])
+        if k <= 1:
+            return volume
+        image = as_float32(volume.image)
+        blurred = median_filter(image, size=k, mode=self.mode)
+        return volume.replace(image=blurred.astype(np.float32, copy=False))
+
+    def to_dict(self) -> dict[str, Any]:
+        kr = self.ksize_range
+        return {
+            "name": self.__class__.__name__,
+            "params": {
+                "ksize": kr[0] if kr[0] == kr[1] else list(kr),
+                "mode": self.mode,
                 "p": self.p,
             },
         }

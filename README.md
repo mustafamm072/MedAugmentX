@@ -81,7 +81,7 @@ Verify the installation:
 
 ```python
 import medaugmentx
-print(medaugmentx.__version__)   # 0.5.0
+print(medaugmentx.__version__)   # 0.6.0
 ```
 
 ---
@@ -273,6 +273,10 @@ See [API examples](docs/API_EXAMPLES.md) and the [API reference](docs/API_REFERE
 | `RandomFlip` | Per-axis flip with independent probability |
 | `AnatomicCrop` | Foreground-biased random crop |
 | `ElasticDeform` | Anisotropic B-spline elastic deformation |
+| `CoarseDropout` | Cutout-style random box occlusion (2D/3D) |
+| `Resize` | Resample to a fixed shape (rescales spacing) |
+| `Pad` | Centre-pad up to a target shape |
+| `CenterCrop` | Centre-crop to a target shape |
 
 ### Intensity transforms
 
@@ -285,7 +289,11 @@ See [API examples](docs/API_EXAMPLES.md) and the [API reference](docs/API_REFERE
 | `WindowLevel` | Random CT window/level shift (protocol variation) |
 | `BrightnessContrast` | Additive brightness + multiplicative contrast |
 | `GaussianBlur` | Isotropic Gaussian blur |
+| `MedianBlur` | Edge-preserving median filter (salt-and-pepper / speckle) |
 | `SimulateLowResolution` | Downsample + upsample (cross-site resolution variation) |
+| `Sharpen` | Unsharp-mask edge enhancement |
+| `CLAHEContrast` | Contrast Limited Adaptive Histogram Equalization |
+| `HistogramMatch` | Match intensity histogram to a reference distribution |
 
 ### Modality-specific — MRI
 
@@ -293,12 +301,21 @@ See [API examples](docs/API_EXAMPLES.md) and the [API reference](docs/API_REFERE
 | --- | --- |
 | `GhostingArtifact` | Phase-encoding ghosting (shifted attenuated replica) |
 | `KSpaceDropout` | Random k-space line zeroing with Gibbs ringing reconstruction |
+| `MRIMotion` | In-plane rigid motion blur/ghosting (averaged motion states) |
 
 ### Modality-specific — CT
 
 | Transform | What it does |
 | --- | --- |
 | `BeamHardening` | Radially-symmetric cupping artifact |
+| `MetalStreak` | Radiating bright/dark streaks from dense implants |
+
+### Modality-specific — X-ray (DXR)
+
+| Transform | What it does |
+| --- | --- |
+| `ScatterSimulation` | Low-frequency scatter (veiling glare), lowers contrast |
+| `GridArtifact` | Stationary anti-scatter grid line pattern |
 
 ### Modality-specific — Tomosynthesis (DBT)
 
@@ -308,6 +325,8 @@ See [API examples](docs/API_EXAMPLES.md) and the [API reference](docs/API_REFERE
 | `LimitedAngleBlur` | Arc-angle-dependent Z-only blur |
 | `SliceDropout` | Random slice zeroing (robustness) |
 | `AnisotropicElastic` | DBT-default elastic deformation |
+| `CompressionVariation` | Breast-paddle compression variation (mask-consistent) |
+| `ReconStreak` | Limited-angle out-of-plane parallax replicas |
 
 ### I/O
 
@@ -347,7 +366,7 @@ assert np.array_equal(a.image, b.image)  # always passes
 | --- | --- |
 | **1 — Core MVP** | ✅ Core data model, spatial/intensity transforms, DBT, DICOM/NIfTI I/O |
 | **2 — Modality artifacts & serialisation** | ✅ MRI (bias field, ghosting, k-space), CT (beam hardening), presets, JSON/YAML |
-| **3 — Framework interop, GPU backend, v1.0** | In progress: `0.5.0` adds custom-transform registration; `0.4.0` shipped TorchIO interop |
+| **3 — Framework interop, GPU backend, v1.0** | In progress: `0.6.0` adds 14 new transforms (motion, metal, scatter, grid, CLAHE, histogram match, compression, recon streak, cutout, resize/pad/crop) and a new X-ray modality module; `0.5.0` added custom-transform registration; `0.4.0` shipped TorchIO interop |
 
 Detailed deliverables: [docs/MILESTONES.md](docs/MILESTONES.md).
 Developer API: [docs/API_REFERENCE.md](docs/API_REFERENCE.md).

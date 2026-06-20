@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-06-19
+
+### Added
+
+This release roughly doubles the transform library — from 22 to 36 registered
+transforms — completing the deferred Phase 3 modality artifacts and adding a
+set of general-purpose transforms for parity with (and breadth beyond)
+comparable 3D medical augmentation libraries. Every new transform is seedable,
+serialisable, mask-safe, and covered by unit tests.
+
+**Spatial transforms** (`medaugmentx.transforms.spatial`)
+- `CoarseDropout` — cutout-style random rectangular/box occlusion (2D/3D),
+  optional mask blanking.
+- `Resize` — resample to a fixed shape; mask uses nearest-neighbour and
+  `spacing` is rescaled to match the new voxel grid.
+- `Pad` — centre-pad up to a target shape (never crops).
+- `CenterCrop` — centre-crop to a target shape (never pads). Pair with `Pad`
+  to force an exact shape for batching.
+
+**Intensity transforms** (`medaugmentx.transforms.intensity`)
+- `MedianBlur` — edge-preserving median filter (salt-and-pepper / speckle).
+- `Sharpen` — unsharp-mask edge enhancement.
+- `CLAHEContrast` — Contrast Limited Adaptive Histogram Equalization with
+  bilinear tile interpolation (pure NumPy, applied per-slice for 3D).
+- `HistogramMatch` — match the intensity histogram to a reference distribution,
+  with a `blend` ratio; reference serialises inline (or `None` for identity).
+
+**Modality transforms — MRI** (`medaugmentx.transforms.modality.mri`)
+- `MRIMotion` — in-plane rigid-body motion blur/ghosting (averaged motion
+  states).
+
+**Modality transforms — CT** (`medaugmentx.transforms.modality.ct`)
+- `MetalStreak` — radiating bright/dark streak artifact from dense implants.
+
+**Modality transforms — X-ray** (`medaugmentx.transforms.modality.xray`, new)
+- `ScatterSimulation` — low-frequency scatter (veiling glare) that lowers
+  contrast.
+- `GridArtifact` — stationary anti-scatter grid line pattern.
+
+**Modality transforms — Tomosynthesis** (`medaugmentx.transforms.modality.tomosynthesis`)
+- `CompressionVariation` — anisotropic breast-paddle compression variation
+  (mask-consistent in-plane scaling).
+- `ReconStreak` — limited-angle out-of-plane reconstruction streaks
+  (parallax replicas across neighbouring planes).
+
+### Changed
+
+- Preset pipelines now incorporate the new artifacts: `mri_pipeline` adds
+  `MRIMotion` to its artifact `OneOf`; `ct_pipeline` adds occasional
+  `MetalStreak`; `dxr_pipeline` adds `CLAHEContrast` and a scatter/grid
+  `OneOf`; `dbt_pipeline` adds `CompressionVariation` and `ReconStreak`.
+- All 14 new transforms are registered in `serialization.REGISTRY` and
+  re-exported from `medaugmentx.transforms`.
+- Version bumped to `0.6.0`.
+
+### Documentation
+
+- README, API reference, architecture, and milestones updated for the
+  expanded transform library and the new X-ray modality module.
+- Roadmap items 3.8 (remaining deferred transforms) and 3.9 (benchmark suite)
+  marked complete.
+
+### Tooling
+
+- Added `benchmarks/benchmark.py`, a dependency-free per-transform speed
+  benchmark with a configurable volume shape, plus `benchmarks/README.md`
+  documenting the CPU 500 ms target and the still-planned GPU backend.
+
 ## [0.5.0] — 2026-06-15
 
 ### Added

@@ -53,15 +53,16 @@ serialisation layer, and pre-built preset pipelines.
 ### Remaining Phase 2 work (deferred to Phase 3)
 
 The following items from the original Phase 2 scope were intentionally
-deferred to keep the release focused and the library lightweight:
+deferred to keep the release focused and the library lightweight. The
+augmentation transforms shipped in `0.6.0`:
 
-- Vendor-specific DICOM parsers (Hologic, GE, Siemens multi-frame DBT)
-- `MRIMotion` (in-plane rigid motion blur)
-- `MetalStreak` (CT metal artifact simulation)
-- `ScatterSimulation`, `GridArtifact` (X-ray)
-- `CompressionVariation`, `ReconStreak` (DBT reconstruction)
-- `CLAHEContrast`, `HistogramMatch` (advanced intensity)
-- Anatomical plausibility validator
+- Vendor-specific DICOM parsers (Hologic, GE, Siemens multi-frame DBT) — *still planned (3.7)*
+- `MRIMotion` (in-plane rigid motion blur) — ✅ `0.6.0`
+- `MetalStreak` (CT metal artifact simulation) — ✅ `0.6.0`
+- `ScatterSimulation`, `GridArtifact` (X-ray) — ✅ `0.6.0`
+- `CompressionVariation`, `ReconStreak` (DBT reconstruction) — ✅ `0.6.0`
+- `CLAHEContrast`, `HistogramMatch` (advanced intensity) — ✅ `0.6.0`
+- Anatomical plausibility validator — *still planned*
 
 ---
 
@@ -81,8 +82,8 @@ training stacks while keeping the default install lightweight.
 | 3.5 | TorchIO subject adapter and richer MONAI integration | `interop/` | ✅ `0.4.0` |
 | 3.6 | Commercial adoption and security guidance | `docs/COMMERCIAL_ADOPTION.md`, `SECURITY.md` | ✅ `0.4.0` |
 | 3.7 | Vendor DICOM parsers — Hologic, GE, Siemens | `io/dicom_vendor/` | Planned |
-| 3.8 | Remaining deferred transforms (motion, scatter, CLAHE, …) | `transforms/modality/` | Planned |
-| 3.9 | Benchmark suite (speed, memory, augmentation diversity) | `benchmarks/` | Planned |
+| 3.8 | Remaining deferred transforms (motion, metal, scatter, grid, CLAHE, histogram match, compression, recon streak) + general transforms (cutout, resize/pad/crop, median blur, sharpen) | `transforms/` | ✅ `0.6.0` |
+| 3.9 | Benchmark suite (per-transform speed) | `benchmarks/` | ✅ `0.6.0` |
 | 3.10 | Sphinx documentation site | `docs/sphinx/` | Planned |
 | 3.11 | Jupyter tutorials (MRI, CT, DBT) | `notebooks/` | Planned |
 | 3.12 | v1.0 release + GitHub Actions CD pipeline | `.github/` | Planned |

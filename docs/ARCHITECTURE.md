@@ -19,7 +19,7 @@ layout and the rules each layer follows.
 ├─────────────────────────────────────────────────────────────────┤
 │ Transforms                                                      │
 │   spatial/   intensity/   modality/mri/   modality/ct/          │
-│                           modality/tomosynthesis/               │
+│                           modality/xray/  modality/tomosynthesis/ │
 ├─────────────────────────────────────────────────────────────────┤
 │ Core                                                            │
 │   MedVolume · Transform ABC · seedable RNG · helpers            │
@@ -110,11 +110,12 @@ Subdivided by *what* changes about the image:
 
 | Folder | Changes | Contents |
 | --- | --- | --- |
-| `spatial/` | Geometry — pixels move | `RandomAffine`, `RandomFlip`, `AnatomicCrop`, `ElasticDeform` |
-| `intensity/` | Per-pixel value, geometry preserved | `GaussianNoise`, `RicianNoise`, `GammaCorrection`, `BiasField`, `WindowLevel`, `BrightnessContrast`, `GaussianBlur`, `SimulateLowResolution` |
-| `modality/mri/` | MRI-specific artifacts | `GhostingArtifact`, `KSpaceDropout` |
-| `modality/ct/` | CT-specific artifacts | `BeamHardening` |
-| `modality/tomosynthesis/` | DBT-specific | `SlabShift`, `LimitedAngleBlur`, `SliceDropout`, `AnisotropicElastic` |
+| `spatial/` | Geometry — pixels move | `RandomAffine`, `RandomFlip`, `AnatomicCrop`, `ElasticDeform`, `CoarseDropout`, `Resize`, `Pad`, `CenterCrop` |
+| `intensity/` | Per-pixel value, geometry preserved | `GaussianNoise`, `RicianNoise`, `GammaCorrection`, `BiasField`, `WindowLevel`, `BrightnessContrast`, `GaussianBlur`, `MedianBlur`, `SimulateLowResolution`, `Sharpen`, `CLAHEContrast`, `HistogramMatch` |
+| `modality/mri/` | MRI-specific artifacts | `GhostingArtifact`, `KSpaceDropout`, `MRIMotion` |
+| `modality/ct/` | CT-specific artifacts | `BeamHardening`, `MetalStreak` |
+| `modality/xray/` | X-ray (DXR) artifacts | `ScatterSimulation`, `GridArtifact` |
+| `modality/tomosynthesis/` | DBT-specific | `SlabShift`, `LimitedAngleBlur`, `SliceDropout`, `AnisotropicElastic`, `CompressionVariation`, `ReconStreak` |
 
 ### Mask consistency contract
 
@@ -161,7 +162,7 @@ pipeline  ──to_json()──►  JSON string  ──from_json()──►  pip
 pipeline  ──to_yaml()──►  YAML string  ──from_yaml()──►  pipeline  (requires PyYAML)
 ```
 
-**`REGISTRY`** maps class names to classes. All 22 built-in transforms are
+**`REGISTRY`** maps class names to classes. All 36 built-in transforms are
 registered at import time. Custom transforms can be added with the
 `@register_transform` decorator (validates the class and prevents accidental
 name collisions) or by direct assignment:
@@ -282,7 +283,7 @@ local clinical, security, privacy, and regulatory validation. See
 - **Mask consistency** regression tests for spatial transforms.
 - **Integration tests** under `tests/integration/` exercise the full pipeline
   end-to-end with a 100-seed regression for image/mask alignment.
-- **Serialisation tests** verify JSON round-trip for all 22 registered
+- **Serialisation tests** verify JSON round-trip for all 36 registered
   transforms and all three container types.
 - **Preset tests** verify that each preset runs on the correct volume
   dimensionality, produces bit-identical output under the same seed, and

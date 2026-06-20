@@ -1,6 +1,6 @@
 # API Reference
 
-Version: `0.5.0`
+Version: `0.6.0`
 
 This page documents the supported public imports. Prefer these paths in
 applications, papers, tutorials, and commercial code; internal module paths may
@@ -82,9 +82,15 @@ from medaugmentx.transforms import RandomAffine, RicianNoise, BiasField
 | `RandomFlip` | `axes=("x",), p_per_axis=0.5, p=1.0, seed=None` |
 | `AnatomicCrop` | `size, foreground_prob=0.5, foreground_threshold=0.0, p=1.0, seed=None` |
 | `ElasticDeform` | `alpha=30.0, sigma=4.0, order=1, mode="reflect", cval=0.0, p=1.0, seed=None` |
+| `CoarseDropout` | `num_holes=(1, 4), hole_size=(0.05, 0.2), fill_value=0.0, fill_mask=False, p=1.0, seed=None` |
+| `Resize` | `size, order=1, p=1.0, seed=None` |
+| `Pad` | `size, mode="constant", cval=0.0, p=1.0, seed=None` |
+| `CenterCrop` | `size, p=1.0, seed=None` |
 
 Spatial transforms apply the same sampled geometry to `image` and `mask`, and
-use nearest-neighbour interpolation for masks.
+use nearest-neighbour interpolation for masks. `Resize`/`Pad`/`CenterCrop` are
+deterministic shape-normalisation helpers (`Pad` never crops, `CenterCrop`
+never pads — pair them to force an exact shape).
 
 ### Intensity
 
@@ -97,7 +103,11 @@ use nearest-neighbour interpolation for masks.
 | `WindowLevel` | `center_shift_frac=0.1, width_scale=(0.8, 1.2), rescale_output=True, p=1.0, seed=None` |
 | `BrightnessContrast` | `brightness=0.0, contrast=(0.9, 1.1), clip=None, p=1.0, seed=None` |
 | `GaussianBlur` | `sigma=(0.5, 1.5), order=0, mode="reflect", p=1.0, seed=None` |
+| `MedianBlur` | `ksize=3, mode="reflect", p=1.0, seed=None` |
 | `SimulateLowResolution` | `zoom_range=(0.5, 0.9), order_down=1, order_up=1, per_axis=False, p=1.0, seed=None` |
+| `Sharpen` | `alpha=(0.2, 0.8), sigma=(0.7, 1.5), clip=None, p=1.0, seed=None` |
+| `CLAHEContrast` | `clip_limit=(1.0, 3.0), grid=(8, 8), n_bins=256, p=1.0, seed=None` |
+| `HistogramMatch` | `reference=None, blend=1.0, n_quantiles=256, p=1.0, seed=None` |
 
 Intensity transforms leave masks unchanged.
 
@@ -107,11 +117,17 @@ Intensity transforms leave masks unchanged.
 | --- | --- | --- |
 | MRI | `GhostingArtifact` | `ghost_intensity=(0.05, 0.15), ghost_shift=(8, 32), phase_encode_axis="y", num_ghosts=1, p=1.0, seed=None` |
 | MRI | `KSpaceDropout` | `dropout_fraction=(0.01, 0.05), phase_encode_axis="y", p=1.0, seed=None` |
+| MRI | `MRIMotion` | `degrees=(1.0, 5.0), translation=(1.0, 4.0), num_movements=(1, 3), p=1.0, seed=None` |
 | CT | `BeamHardening` | `alpha=(0.02, 0.08), power=2.0, p=1.0, seed=None` |
+| CT | `MetalStreak` | `intensity=(0.1, 0.3), num_streaks=(6, 12), num_sources=1, falloff=0.5, p=1.0, seed=None` |
+| X-ray | `ScatterSimulation` | `fraction=(0.1, 0.4), sigma=(15.0, 40.0), p=1.0, seed=None` |
+| X-ray | `GridArtifact` | `amplitude=(0.03, 0.1), frequency=(0.2, 0.45), axis="x", p=1.0, seed=None` |
 | DBT | `SlabShift` | `max_shift=2, cval=0.0, p=1.0, seed=None` |
 | DBT | `LimitedAngleBlur` | `arc_degrees=(15.0, 25.0), base_sigma=1.0, reference_arc_deg=20.0, p=1.0, seed=None` |
 | DBT | `SliceDropout` | `num_slices=1, cval=0.0, affect_mask=False, p=1.0, seed=None` |
 | DBT | `AnisotropicElastic` | `alpha=(100.0, 100.0, 8.0), sigma=(8.0, 8.0, 2.0), order=1, p=1.0, seed=None` |
+| DBT | `CompressionVariation` | `scale=(0.85, 1.15), axis="y", order=1, p=1.0, seed=None` |
+| DBT | `ReconStreak` | `amplitude=(0.05, 0.2), num_planes=(1, 3), displacement=1.5, decay=0.6, axis="x", p=1.0, seed=None` |
 
 ---
 

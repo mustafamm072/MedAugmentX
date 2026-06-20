@@ -58,8 +58,10 @@ def _register_builtins() -> None:
     # Spatial
     from medaugmentx.transforms.spatial.affine import RandomAffine
     from medaugmentx.transforms.spatial.crop import AnatomicCrop
+    from medaugmentx.transforms.spatial.dropout import CoarseDropout
     from medaugmentx.transforms.spatial.elastic import ElasticDeform
     from medaugmentx.transforms.spatial.flip import RandomFlip
+    from medaugmentx.transforms.spatial.resize import CenterCrop, Pad, Resize
 
     REGISTRY.update(
         {
@@ -67,15 +69,26 @@ def _register_builtins() -> None:
             "RandomFlip": RandomFlip,
             "AnatomicCrop": AnatomicCrop,
             "ElasticDeform": ElasticDeform,
+            "CoarseDropout": CoarseDropout,
+            "Resize": Resize,
+            "Pad": Pad,
+            "CenterCrop": CenterCrop,
         }
     )
 
     # Intensity
     from medaugmentx.transforms.intensity.bias_field import BiasField
-    from medaugmentx.transforms.intensity.blur import GaussianBlur, SimulateLowResolution
+    from medaugmentx.transforms.intensity.blur import (
+        GaussianBlur,
+        MedianBlur,
+        SimulateLowResolution,
+    )
     from medaugmentx.transforms.intensity.brightness_contrast import BrightnessContrast
+    from medaugmentx.transforms.intensity.clahe import CLAHEContrast
     from medaugmentx.transforms.intensity.contrast import GammaCorrection
+    from medaugmentx.transforms.intensity.histogram import HistogramMatch
     from medaugmentx.transforms.intensity.noise import GaussianNoise, RicianNoise
+    from medaugmentx.transforms.intensity.sharpen import Sharpen
     from medaugmentx.transforms.intensity.window_level import WindowLevel
 
     REGISTRY.update(
@@ -87,14 +100,20 @@ def _register_builtins() -> None:
             "WindowLevel": WindowLevel,
             "BrightnessContrast": BrightnessContrast,
             "GaussianBlur": GaussianBlur,
+            "MedianBlur": MedianBlur,
             "SimulateLowResolution": SimulateLowResolution,
+            "Sharpen": Sharpen,
+            "CLAHEContrast": CLAHEContrast,
+            "HistogramMatch": HistogramMatch,
         }
     )
 
     # Tomosynthesis
     from medaugmentx.transforms.modality.tomosynthesis.blur import LimitedAngleBlur
+    from medaugmentx.transforms.modality.tomosynthesis.compression import CompressionVariation
     from medaugmentx.transforms.modality.tomosynthesis.dropout import SliceDropout
     from medaugmentx.transforms.modality.tomosynthesis.elastic import AnisotropicElastic
+    from medaugmentx.transforms.modality.tomosynthesis.recon_streak import ReconStreak
     from medaugmentx.transforms.modality.tomosynthesis.slab import SlabShift
 
     REGISTRY.update(
@@ -103,19 +122,35 @@ def _register_builtins() -> None:
             "LimitedAngleBlur": LimitedAngleBlur,
             "SliceDropout": SliceDropout,
             "AnisotropicElastic": AnisotropicElastic,
+            "CompressionVariation": CompressionVariation,
+            "ReconStreak": ReconStreak,
         }
     )
 
     # MRI
     from medaugmentx.transforms.modality.mri.ghosting import GhostingArtifact
     from medaugmentx.transforms.modality.mri.kspace import KSpaceDropout
+    from medaugmentx.transforms.modality.mri.motion import MRIMotion
 
-    REGISTRY.update({"GhostingArtifact": GhostingArtifact, "KSpaceDropout": KSpaceDropout})
+    REGISTRY.update(
+        {
+            "GhostingArtifact": GhostingArtifact,
+            "KSpaceDropout": KSpaceDropout,
+            "MRIMotion": MRIMotion,
+        }
+    )
 
     # CT
     from medaugmentx.transforms.modality.ct.beam_hardening import BeamHardening
+    from medaugmentx.transforms.modality.ct.metal import MetalStreak
 
-    REGISTRY.update({"BeamHardening": BeamHardening})
+    REGISTRY.update({"BeamHardening": BeamHardening, "MetalStreak": MetalStreak})
+
+    # X-ray (DXR)
+    from medaugmentx.transforms.modality.xray.grid import GridArtifact
+    from medaugmentx.transforms.modality.xray.scatter import ScatterSimulation
+
+    REGISTRY.update({"ScatterSimulation": ScatterSimulation, "GridArtifact": GridArtifact})
 
 
 _register_builtins()

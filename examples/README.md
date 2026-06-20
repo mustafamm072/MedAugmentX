@@ -11,6 +11,7 @@ PYTHONPATH=. python examples/<name>.py
 | Script | What it shows |
 | --- | --- |
 | [`quickstart.py`](quickstart.py) | The MedAugmentX "hello world" — build a `MedVolume`, run a mixed pipeline, inspect the result. |
+| [`new_transforms.py`](new_transforms.py) | Tour of the 0.6.0 additions: cutout, shape normalisation, CLAHE, histogram matching, and the new MRI/CT/X-ray/DBT artifacts. |
 | [`dbt_pipeline.py`](dbt_pipeline.py) | The tomosynthesis pipeline on a synthetic DBT slab with anisotropic spacing. |
 | [`framework_interop.py`](framework_interop.py) | Use `TorchTransform`, `MonaiMapTransform`, and `TorchIOTransform` with framework-style samples. |
 | [`custom_transform.py`](custom_transform.py) | How to author your own seedable transform and drop it into `Compose`. |

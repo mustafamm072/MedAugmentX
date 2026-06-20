@@ -35,7 +35,7 @@ def mri_pipeline(seed: SeedLike = None) -> Compose:
     * Bias field — RF coil / B0 inhomogeneity.
     * Rician noise — the physically correct MRI noise model.
     * Gamma correction — scanner contrast variation.
-    * One of: ghosting artifact *or* k-space line dropout.
+    * One of: ghosting artifact, k-space line dropout, *or* motion blur.
 
     Args:
         seed: Top-level RNG seed for reproducibility.
@@ -48,6 +48,7 @@ def mri_pipeline(seed: SeedLike = None) -> Compose:
     from medaugmentx.transforms.intensity.noise import RicianNoise
     from medaugmentx.transforms.modality.mri.ghosting import GhostingArtifact
     from medaugmentx.transforms.modality.mri.kspace import KSpaceDropout
+    from medaugmentx.transforms.modality.mri.motion import MRIMotion
     from medaugmentx.transforms.spatial.affine import RandomAffine
     from medaugmentx.transforms.spatial.elastic import ElasticDeform
     from medaugmentx.transforms.spatial.flip import RandomFlip
@@ -62,7 +63,8 @@ def mri_pipeline(seed: SeedLike = None) -> Compose:
             GammaCorrection(gamma=(0.85, 1.15), p=0.5),
             OneOf(
                 [GhostingArtifact(ghost_intensity=(0.05, 0.12), p=1.0),
-                 KSpaceDropout(dropout_fraction=(0.01, 0.04), p=1.0)],
+                 KSpaceDropout(dropout_fraction=(0.01, 0.04), p=1.0),
+                 MRIMotion(degrees=(1.0, 4.0), translation=(1.0, 3.0), p=1.0)],
                 p=0.3,
             ),
         ],
@@ -87,6 +89,7 @@ def ct_pipeline(seed: SeedLike = None) -> Compose:
     * Gaussian noise — additive CT quantum noise.
     * Gamma correction — contrast variation.
     * Beam hardening (cupping artifact) — applied occasionally.
+    * Metal streak artifact — implant/clip simulation, applied rarely.
 
     Args:
         seed: Top-level RNG seed for reproducibility.
@@ -98,6 +101,7 @@ def ct_pipeline(seed: SeedLike = None) -> Compose:
     from medaugmentx.transforms.intensity.noise import GaussianNoise
     from medaugmentx.transforms.intensity.window_level import WindowLevel
     from medaugmentx.transforms.modality.ct.beam_hardening import BeamHardening
+    from medaugmentx.transforms.modality.ct.metal import MetalStreak
     from medaugmentx.transforms.spatial.affine import RandomAffine
     from medaugmentx.transforms.spatial.elastic import ElasticDeform
     from medaugmentx.transforms.spatial.flip import RandomFlip
@@ -111,6 +115,7 @@ def ct_pipeline(seed: SeedLike = None) -> Compose:
             GaussianNoise(std=(5.0, 20.0), p=0.4),
             GammaCorrection(gamma=(0.9, 1.1), p=0.4),
             BeamHardening(alpha=(0.02, 0.07), p=0.3),
+            MetalStreak(intensity=(0.1, 0.25), p=0.15),
         ],
         seed=seed,
     )
@@ -131,7 +136,9 @@ def dxr_pipeline(seed: SeedLike = None) -> Compose:
     * Gaussian blur — simulates detector resolution variation.
     * Brightness/contrast — exposure variation between scanners.
     * Gamma correction — film/detector response variation.
+    * CLAHE — adaptive contrast equalisation (standard CXR pre-processing).
     * Simulate low resolution — cross-site resolution augmentation.
+    * One of: scatter (veiling glare) *or* anti-scatter grid lines.
 
     Args:
         seed: Top-level RNG seed for reproducibility.
@@ -141,7 +148,10 @@ def dxr_pipeline(seed: SeedLike = None) -> Compose:
     """
     from medaugmentx.transforms.intensity.blur import GaussianBlur, SimulateLowResolution
     from medaugmentx.transforms.intensity.brightness_contrast import BrightnessContrast
+    from medaugmentx.transforms.intensity.clahe import CLAHEContrast
     from medaugmentx.transforms.intensity.contrast import GammaCorrection
+    from medaugmentx.transforms.modality.xray.grid import GridArtifact
+    from medaugmentx.transforms.modality.xray.scatter import ScatterSimulation
     from medaugmentx.transforms.spatial.affine import RandomAffine
     from medaugmentx.transforms.spatial.flip import RandomFlip
 
@@ -157,7 +167,13 @@ def dxr_pipeline(seed: SeedLike = None) -> Compose:
             GaussianBlur(sigma=(0.3, 1.2), p=0.4),
             BrightnessContrast(brightness=0.05, contrast=(0.9, 1.1), p=0.5),
             GammaCorrection(gamma=(0.8, 1.2), p=0.5),
+            CLAHEContrast(clip_limit=(1.0, 2.5), p=0.3),
             SimulateLowResolution(zoom_range=(0.6, 0.95), p=0.3),
+            OneOf(
+                [ScatterSimulation(fraction=(0.1, 0.3), p=1.0),
+                 GridArtifact(amplitude=(0.03, 0.08), p=1.0)],
+                p=0.25,
+            ),
         ],
         seed=seed,
     )
@@ -178,8 +194,10 @@ def dbt_pipeline(seed: SeedLike = None) -> Compose:
     * Random flip — horizontal axis only (breast anatomy).
     * Anisotropic affine — in-plane rotation only (``axes_enabled=("x","y")``).
     * Anisotropic elastic deformation — larger XY alpha, small Z.
+    * Compression variation — breast-paddle compression differences.
     * Slab shift — reconstruction centre variation.
     * Limited-angle blur — arc-angle-dependent Z blur.
+    * Recon streak — limited-angle out-of-plane parallax replicas.
     * Slice dropout — robustness to missing reconstruction slices.
     * Bias field — detector gain non-uniformity.
     * Gamma correction — scatter / beam hardening contrast variation.
@@ -193,8 +211,10 @@ def dbt_pipeline(seed: SeedLike = None) -> Compose:
     from medaugmentx.transforms.intensity.bias_field import BiasField
     from medaugmentx.transforms.intensity.contrast import GammaCorrection
     from medaugmentx.transforms.modality.tomosynthesis.blur import LimitedAngleBlur
+    from medaugmentx.transforms.modality.tomosynthesis.compression import CompressionVariation
     from medaugmentx.transforms.modality.tomosynthesis.dropout import SliceDropout
     from medaugmentx.transforms.modality.tomosynthesis.elastic import AnisotropicElastic
+    from medaugmentx.transforms.modality.tomosynthesis.recon_streak import ReconStreak
     from medaugmentx.transforms.modality.tomosynthesis.slab import SlabShift
     from medaugmentx.transforms.spatial.affine import RandomAffine
     from medaugmentx.transforms.spatial.flip import RandomFlip
@@ -213,8 +233,10 @@ def dbt_pipeline(seed: SeedLike = None) -> Compose:
                 sigma=(8.0, 8.0, 2.0),
                 p=0.5,
             ),
+            CompressionVariation(scale=(0.9, 1.1), axis="y", p=0.4),
             SlabShift(max_shift=2, p=0.5),
             LimitedAngleBlur(arc_degrees=(15.0, 25.0), p=0.6),
+            ReconStreak(amplitude=(0.05, 0.15), p=0.3),
             SliceDropout(num_slices=(1, 2), p=0.3),
             BiasField(alpha=0.2, coarse_shape=3, p=0.5),
             GammaCorrection(gamma=(0.85, 1.15), p=0.5),
