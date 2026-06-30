@@ -9,8 +9,9 @@ from medaugmentx.core import (
     SomeOf,
     Transform,
 )
+from medaugmentx.inspection import PipelineStep, iter_pipeline, pipeline_summary
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 __all__ = [
     "__version__",
@@ -19,4 +20,7 @@ __all__ = [
     "Compose",
     "OneOf",
     "SomeOf",
+    "PipelineStep",
+    "iter_pipeline",
+    "pipeline_summary",
 ]

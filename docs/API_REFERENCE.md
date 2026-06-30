@@ -1,6 +1,6 @@
 # API Reference
 
-Version: `0.6.0`
+Version: `0.7.0`
 
 This page documents the supported public imports. Prefer these paths in
 applications, papers, tutorials, and commercial code; internal module paths may
@@ -11,7 +11,16 @@ move before `1.0`.
 ## Core API
 
 ```python
-from medaugmentx import MedVolume, Transform, Compose, OneOf, SomeOf
+from medaugmentx import (
+    MedVolume,
+    Transform,
+    Compose,
+    OneOf,
+    SomeOf,
+    PipelineStep,
+    iter_pipeline,
+    pipeline_summary,
+)
 ```
 
 ### `MedVolume`
@@ -63,6 +72,26 @@ SomeOf(transforms, n=1, p=1.0, seed=None)
 `Compose` applies children sequentially. `OneOf` chooses exactly one child.
 `SomeOf` chooses `n` children without replacement. All containers seed child
 transforms deterministically from the parent seed.
+
+### Pipeline inspection
+
+```python
+pipeline_summary(transform, max_value_length=72) -> str
+iter_pipeline(transform) -> Iterator[PipelineStep]
+```
+
+`pipeline_summary` returns a compact multi-line tree for a single transform or
+nested pipeline. It is intended for experiment logs, review notes, and saved
+augmentation policy summaries.
+
+`iter_pipeline` yields `PipelineStep` objects in depth-first order:
+
+| Field | Description |
+| --- | --- |
+| `path` | Tuple of child indices from the root; root is `()` |
+| `name` | Transform class name |
+| `params` | Parameters from `to_dict()`, excluding nested `transforms` |
+| `depth` | Nesting depth, equal to `len(path)` |
 
 ---
 

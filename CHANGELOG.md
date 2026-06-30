@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-06-29
+
+### Added
+
+- `medaugmentx.pipeline_summary` and `medaugmentx.iter_pipeline` for
+  human-readable and programmatic inspection of transforms and nested
+  pipelines. The helpers are backed by each transform's `to_dict()` structure
+  so summaries stay aligned with JSON/YAML serialisation.
+- `medaugmentx.PipelineStep`, a small dataclass describing each inspected
+  pipeline node (`path`, `name`, `params`, `depth`).
+
+### Changed
+
+- Version bumped to `0.7.0`.
+
+### Documentation
+
+- README, API reference, and API examples now document pipeline inspection for
+  experiment logs and augmentation policy review.
+
 ## [0.6.0] — 2026-06-19
 
 ### Added

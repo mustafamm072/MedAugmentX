@@ -352,12 +352,15 @@ Drop it into a `Compose` like any built-in transform. Always sample from
 ## 13. Inspect and introspect a pipeline
 
 ```python
-print(pipeline)
-# Compose(transforms=[RandomAffine(...), BiasField(...), ...], p=1.0)
+from medaugmentx import iter_pipeline, pipeline_summary
 
-# Dict form — suitable for logging or passing to from_dict()
-import json
-print(json.dumps(pipeline.to_dict(), indent=2, default=str))
+print(pipeline_summary(pipeline))
+# Compose(p=1.0, seed=42)
+#   0 RandomAffine(...)
+#   1 BiasField(...)
+
+for step in iter_pipeline(pipeline):
+    print(step.path, step.name, step.params)
 ```
 
 ---

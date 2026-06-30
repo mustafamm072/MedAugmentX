@@ -84,9 +84,10 @@ training stacks while keeping the default install lightweight.
 | 3.7 | Vendor DICOM parsers — Hologic, GE, Siemens | `io/dicom_vendor/` | Planned |
 | 3.8 | Remaining deferred transforms (motion, metal, scatter, grid, CLAHE, histogram match, compression, recon streak) + general transforms (cutout, resize/pad/crop, median blur, sharpen) | `transforms/` | ✅ `0.6.0` |
 | 3.9 | Benchmark suite (per-transform speed) | `benchmarks/` | ✅ `0.6.0` |
-| 3.10 | Sphinx documentation site | `docs/sphinx/` | Planned |
-| 3.11 | Jupyter tutorials (MRI, CT, DBT) | `notebooks/` | Planned |
-| 3.12 | v1.0 release + GitHub Actions CD pipeline | `.github/` | Planned |
+| 3.10 | Pipeline inspection for experiment logs and augmentation policy review | `medaugmentx/inspection.py` | ✅ `0.7.0` |
+| 3.11 | Sphinx documentation site | `docs/sphinx/` | Planned |
+| 3.12 | Jupyter tutorials (MRI, CT, DBT) | `notebooks/` | Planned |
+| 3.13 | v1.0 release + GitHub Actions CD pipeline | `.github/` | Planned |
 
 ### Acceptance criteria (Phase 3 / v1.0)
 

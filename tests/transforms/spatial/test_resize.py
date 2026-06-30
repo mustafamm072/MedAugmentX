@@ -3,6 +3,7 @@ import pytest
 
 from medaugmentx.core import MedVolume
 from medaugmentx.transforms import CenterCrop, Pad, Resize
+from medaugmentx.transforms.spatial.resize import _force_shape
 
 
 @pytest.fixture
@@ -62,6 +63,16 @@ def test_resize_to_dict_round_trip():
     t = Resize(size=(16, 16), order=1, p=1.0)
     t2 = Resize(**t.to_dict()["params"])
     assert t2.size == t.size
+
+
+def test_force_shape_constant_pads_with_requested_fill():
+    arr = np.array([[1, 2], [3, 4]], dtype=np.float32)
+    out = _force_shape(arr, (3, 4), fill=0.0)
+    expected = np.array(
+        [[1, 2, 0, 0], [3, 4, 0, 0], [0, 0, 0, 0]],
+        dtype=np.float32,
+    )
+    np.testing.assert_array_equal(out, expected)
 
 
 # ---- Pad ----

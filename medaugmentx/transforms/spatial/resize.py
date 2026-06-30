@@ -210,5 +210,5 @@ def _force_shape(arr: np.ndarray, target: tuple[int, ...], fill: float) -> np.nd
     arr = arr[slices]
     if arr.shape != tuple(target):
         pad = [(0, max(0, t - s)) for t, s in zip(target, arr.shape)]
-        arr = np.pad(arr, pad, mode="edge")
+        arr = np.pad(arr, pad, mode="constant", constant_values=fill)
     return arr

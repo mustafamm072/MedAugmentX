@@ -81,7 +81,7 @@ Verify the installation:
 
 ```python
 import medaugmentx
-print(medaugmentx.__version__)   # 0.6.0
+print(medaugmentx.__version__)   # 0.7.0
 ```
 
 ---
@@ -193,6 +193,34 @@ Direct assignment (`REGISTRY["MyTransform"] = MyTransform`) still works.
 
 ---
 
+## Pipeline inspection
+
+Use `pipeline_summary` to log or review a compact tree of any transform or
+nested pipeline before saving it with your experiment artifacts:
+
+```python
+from medaugmentx import pipeline_summary
+from medaugmentx.presets import mri_pipeline
+
+print(pipeline_summary(mri_pipeline(seed=42)))
+```
+
+Example output:
+
+```text
+Compose(p=1.0, seed=42)
+  0 RandomFlip(...)
+  1 RandomAffine(...)
+  2 OneOf(...)
+    2.0 GhostingArtifact(...)
+    2.1 KSpaceDropout(...)
+```
+
+For programmatic inspection, `iter_pipeline(pipeline)` yields `PipelineStep`
+objects with `path`, `name`, `params`, and `depth`.
+
+---
+
 ## Loading real volumes
 
 ```python
@@ -264,6 +292,7 @@ See [API examples](docs/API_EXAMPLES.md) and the [API reference](docs/API_REFERE
 | `Transform` | Abstract base — probability gating, seedable RNG, `to_dict()` |
 | `Compose` | Sequential pipeline with deterministic child seeding |
 | `OneOf` / `SomeOf` | Random selection from a set of transforms |
+| `pipeline_summary` / `iter_pipeline` | Human-readable and programmatic pipeline inspection |
 
 ### Spatial transforms
 
@@ -366,7 +395,7 @@ assert np.array_equal(a.image, b.image)  # always passes
 | --- | --- |
 | **1 — Core MVP** | ✅ Core data model, spatial/intensity transforms, DBT, DICOM/NIfTI I/O |
 | **2 — Modality artifacts & serialisation** | ✅ MRI (bias field, ghosting, k-space), CT (beam hardening), presets, JSON/YAML |
-| **3 — Framework interop, GPU backend, v1.0** | In progress: `0.6.0` adds 14 new transforms (motion, metal, scatter, grid, CLAHE, histogram match, compression, recon streak, cutout, resize/pad/crop) and a new X-ray modality module; `0.5.0` added custom-transform registration; `0.4.0` shipped TorchIO interop |
+| **3 — Framework interop, GPU backend, v1.0** | In progress: `0.7.0` adds pipeline inspection for experiment logs and policy review; `0.6.0` added 14 transforms and a new X-ray modality module; `0.5.0` added custom-transform registration; `0.4.0` shipped TorchIO interop |
 
 Detailed deliverables: [docs/MILESTONES.md](docs/MILESTONES.md).
 Developer API: [docs/API_REFERENCE.md](docs/API_REFERENCE.md).
