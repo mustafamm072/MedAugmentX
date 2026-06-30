@@ -112,7 +112,7 @@ ignore = ["E501"]
 "tests/io/*.py" = ["E402"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.12"
 ignore_missing_imports = true
 warn_unused_ignores = true
 warn_redundant_casts = true
