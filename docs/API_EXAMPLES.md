@@ -365,7 +365,37 @@ for step in iter_pipeline(pipeline):
 
 ---
 
-## 14. Reproducibility check
+## 14. Validate outputs and guard a pipeline
+
+```python
+from medaugmentx import Compose, Guard, VolumeValidator
+from medaugmentx.transforms import RandomAffine, GammaCorrection
+
+validator = VolumeValidator(
+    intensity_bounds=(0.0, 1.0),   # warn if values leave the normalised range
+    max_foreground_loss=0.5,       # error if a draw crops away >50% of the mask
+    preserve_mask_labels=True,     # error if a labelled class disappears
+)
+
+# Audit a single volume (pass the original for comparative checks):
+report = validator.validate(augmented, reference=original)
+print(report.ok)          # False if any error-severity issue was found
+print(report)             # readable list of errors + warnings
+
+# Guard a pipeline: retry bad draws, fall back to the input if none pass.
+safe = Guard(
+    Compose([RandomAffine(), GammaCorrection()]),
+    validator,
+    on_fail="retry",      # "raise" | "warn" | "revert" | "retry"
+    retries=3,
+    seed=42,
+)
+out = safe(vol)           # guaranteed to pass the validator or return `vol` unchanged
+```
+
+---
+
+## 15. Reproducibility check
 
 ```python
 import numpy as np

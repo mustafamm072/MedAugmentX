@@ -1,6 +1,6 @@
 # API Reference
 
-Version: `0.7.0`
+Version: `0.8.0`
 
 This page documents the supported public imports. Prefer these paths in
 applications, papers, tutorials, and commercial code; internal module paths may
@@ -20,6 +20,11 @@ from medaugmentx import (
     PipelineStep,
     iter_pipeline,
     pipeline_summary,
+    VolumeValidator,
+    Guard,
+    ValidationReport,
+    ValidationIssue,
+    ValidationError,
 )
 ```
 
@@ -92,6 +97,45 @@ augmentation policy summaries.
 | `name` | Transform class name |
 | `params` | Parameters from `to_dict()`, excluding nested `transforms` |
 | `depth` | Nesting depth, equal to `len(path)` |
+
+### Validation & safe augmentation
+
+```python
+VolumeValidator(
+    *,
+    require_finite=True,           # no NaN/Inf                       -> error
+    forbid_constant=True,          # image not collapsed to a value   -> error
+    check_mask_shape=True,         # mask shape == image shape        -> error
+    intensity_bounds=None,         # (low, high) expected range       -> warning
+    strict_bounds=False,           # escalate bounds violation        -> error
+    min_foreground_fraction=None,  # absolute non-zero mask fraction  -> error
+    preserve_mask_labels=True,     # no labelled class fully lost*    -> error
+    max_foreground_loss=None,      # max relative foreground shrink*  -> error
+    max_intensity_shift=None,      # mean drift in reference σ*       -> warning
+).validate(volume, reference=None) -> ValidationReport
+
+Guard(
+    transform,
+    validator=None,                # VolumeValidator | dict | None (defaults)
+    on_fail="raise",               # "raise" | "warn" | "revert" | "retry"
+    retries=1,                     # re-draws in "retry" mode
+    p=1.0,
+    seed=None,
+) -> Transform
+```
+
+Checks marked `*` are comparative and only run when a `reference` volume is
+supplied; `Guard` passes the pre-augmentation volume automatically.
+
+`ValidationReport` is truthy when the volume passed (`report.ok`, i.e. no
+error-severity issues). It exposes `.issues`, `.errors`, and `.warnings` — each
+a tuple of `ValidationIssue(check, severity, message)` — and a readable
+`str()`. `Guard` in `on_fail="raise"` mode raises `ValidationError`, which
+carries the failing report on `.report`.
+
+`Guard` is a `Transform`: it nests inside pipeline containers and round-trips
+through the serialisation `REGISTRY` (its wrapped transform and validator are
+rebuilt by `from_dict`).
 
 ---
 

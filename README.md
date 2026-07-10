@@ -2,7 +2,7 @@
 
 **Clinically-aware medical image augmentation for AI training.**
 
-[![DOI](https://zenodo.org/badge/1231536084.svg)](https://doi.org/10.5281/zenodo.20191189)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20191189.svg)](https://doi.org/10.5281/zenodo.20191189)
 [![Python](https://img.shields.io/badge/python-3.9%20%E2%80%93%203.14-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Status: Phase 3](https://img.shields.io/badge/status-phase%203-blue.svg)](docs/MILESTONES.md)
@@ -81,7 +81,7 @@ Verify the installation:
 
 ```python
 import medaugmentx
-print(medaugmentx.__version__)   # 0.7.0
+print(medaugmentx.__version__)   # 0.8.0
 ```
 
 ---
@@ -221,6 +221,53 @@ objects with `path`, `name`, `params`, and `depth`.
 
 ---
 
+## Safe augmentation
+
+Augmentation can silently produce training-unusable volumes — `NaN` pixels, an
+image collapsed to a constant, a mask that no longer matches the image, or a
+spatial draw that crops the only labelled structure out of frame. None of these
+raise on their own; they just quietly degrade the dataset. `VolumeValidator`
+audits a volume against clinical-plausibility rules, and `Guard` wraps any
+transform or pipeline so bad draws are caught on every call.
+
+```python
+from medaugmentx import Compose, Guard, VolumeValidator
+from medaugmentx.transforms import RandomAffine, GammaCorrection
+
+validator = VolumeValidator(
+    intensity_bounds=(0.0, 1.0),   # windowed / normalised inputs
+    max_foreground_loss=0.5,       # a spatial draw may not crop away >50% of a structure
+    preserve_mask_labels=True,     # never lose a labelled class entirely
+)
+
+# Audit directly:
+report = validator.validate(augmented, reference=original)
+if not report:
+    print(report)                  # human-readable list of errors and warnings
+
+# Or guard a whole pipeline — retry bad draws, fall back to the input if none pass:
+pipeline = Guard(
+    Compose([RandomAffine(), GammaCorrection()]),
+    validator,
+    on_fail="retry",               # "raise" | "warn" | "revert" | "retry"
+    retries=3,
+    seed=42,
+)
+safe = pipeline(vol)
+```
+
+`Guard` is itself a transform, so it nests inside `Compose`/`OneOf`/`SomeOf`
+and serialises to JSON/YAML like everything else. See
+[`examples/safe_augmentation.py`](examples/safe_augmentation.py).
+
+**Scope.** These are structural and statistical sanity checks (finite values,
+dynamic range, mask/label bookkeeping, intensity drift). They catch augmentation
+that is *obviously* unusable; they do **not** verify anatomical correctness or
+clinical validity, and a passing report is not a substitute for your own dataset
+review. Tune the thresholds to your normalisation and labelling conventions.
+
+---
+
 ## Loading real volumes
 
 ```python
@@ -293,6 +340,8 @@ See [API examples](docs/API_EXAMPLES.md) and the [API reference](docs/API_REFERE
 | `Compose` | Sequential pipeline with deterministic child seeding |
 | `OneOf` / `SomeOf` | Random selection from a set of transforms |
 | `pipeline_summary` / `iter_pipeline` | Human-readable and programmatic pipeline inspection |
+| `VolumeValidator` | Clinical-plausibility checks (finite, non-constant, mask sync, intensity bounds, foreground/label preservation, drift) |
+| `Guard` | Wrap a transform/pipeline; validate every output and `raise`/`warn`/`revert`/`retry` on failure |
 
 ### Spatial transforms
 
@@ -395,7 +444,7 @@ assert np.array_equal(a.image, b.image)  # always passes
 | --- | --- |
 | **1 — Core MVP** | ✅ Core data model, spatial/intensity transforms, DBT, DICOM/NIfTI I/O |
 | **2 — Modality artifacts & serialisation** | ✅ MRI (bias field, ghosting, k-space), CT (beam hardening), presets, JSON/YAML |
-| **3 — Framework interop, GPU backend, v1.0** | In progress: `0.7.0` adds pipeline inspection for experiment logs and policy review; `0.6.0` added 14 transforms and a new X-ray modality module; `0.5.0` added custom-transform registration; `0.4.0` shipped TorchIO interop |
+| **3 — Framework interop, GPU backend, v1.0** | In progress: `0.8.0` adds plausibility validation and safe-augmentation guards; `0.7.0` added pipeline inspection for experiment logs and policy review; `0.6.0` added 14 transforms and a new X-ray modality module; `0.5.0` added custom-transform registration; `0.4.0` shipped TorchIO interop |
 
 Detailed deliverables: [docs/MILESTONES.md](docs/MILESTONES.md).
 Developer API: [docs/API_REFERENCE.md](docs/API_REFERENCE.md).

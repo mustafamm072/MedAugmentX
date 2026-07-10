@@ -152,6 +152,11 @@ def _register_builtins() -> None:
 
     REGISTRY.update({"ScatterSimulation": ScatterSimulation, "GridArtifact": GridArtifact})
 
+    # Safety guard (wraps a single transform + a validator)
+    from medaugmentx.validation import Guard
+
+    REGISTRY.update({"Guard": Guard})
+
 
 _register_builtins()
 
@@ -269,6 +274,11 @@ def from_dict(d: dict[str, Any]) -> Transform:
     if name in ("Compose", "OneOf", "SomeOf"):
         child_dicts = params.pop("transforms", [])
         params["transforms"] = [from_dict(c) for c in child_dicts]
+
+    # Guard wraps a single transform; its validator stays as a plain dict and
+    # is rebuilt by Guard.__init__.
+    if name == "Guard" and "transform" in params:
+        params["transform"] = from_dict(params["transform"])
 
     cls = REGISTRY[name]
     return cls(**params)

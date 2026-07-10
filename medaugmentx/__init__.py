@@ -10,8 +10,15 @@ from medaugmentx.core import (
     Transform,
 )
 from medaugmentx.inspection import PipelineStep, iter_pipeline, pipeline_summary
+from medaugmentx.validation import (
+    Guard,
+    ValidationError,
+    ValidationIssue,
+    ValidationReport,
+    VolumeValidator,
+)
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 
 __all__ = [
     "__version__",
@@ -23,4 +30,9 @@ __all__ = [
     "PipelineStep",
     "iter_pipeline",
     "pipeline_summary",
+    "Guard",
+    "VolumeValidator",
+    "ValidationReport",
+    "ValidationIssue",
+    "ValidationError",
 ]

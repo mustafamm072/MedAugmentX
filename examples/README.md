@@ -15,6 +15,7 @@ PYTHONPATH=. python examples/<name>.py
 | [`dbt_pipeline.py`](dbt_pipeline.py) | The tomosynthesis pipeline on a synthetic DBT slab with anisotropic spacing. |
 | [`framework_interop.py`](framework_interop.py) | Use `TorchTransform`, `MonaiMapTransform`, and `TorchIOTransform` with framework-style samples. |
 | [`custom_transform.py`](custom_transform.py) | How to author your own seedable transform and drop it into `Compose`. |
+| [`safe_augmentation.py`](safe_augmentation.py) | Validate augmented volumes with `VolumeValidator` and wrap a pipeline in `Guard` (raise / warn / revert / retry). |
 | [`load_and_augment.py`](load_and_augment.py) | Load a real NIfTI / DICOM volume from disk, augment, and write back. Requires the `io` extra. |
 
 If the optional I/O backends are not installed, the loader scripts fail

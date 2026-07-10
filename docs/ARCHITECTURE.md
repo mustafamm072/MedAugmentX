@@ -15,6 +15,9 @@ layout and the rules each layer follows.
 │ Serialisation  (medaugmentx/serialization.py)                    │
 │   REGISTRY · from_dict · to_json / from_json · to_yaml / from_yaml │
 ├─────────────────────────────────────────────────────────────────┤
+│ Validation & inspection                                         │
+│   VolumeValidator · Guard · pipeline_summary · iter_pipeline    │
+├─────────────────────────────────────────────────────────────────┤
 │ User pipeline  (Compose · OneOf · SomeOf)                       │
 ├─────────────────────────────────────────────────────────────────┤
 │ Transforms                                                      │
@@ -302,3 +305,26 @@ import path. Internal modules (`medaugmentx/transforms/intensity/bias_field.py`,
 etc.) may move between minor versions; the public surface follows SemVer once
 we hit `1.0`. The developer-facing reference lives in
 [API_REFERENCE.md](API_REFERENCE.md).
+
+---
+
+## 11. Validation & guards (`medaugmentx/validation.py`)
+
+This layer sits above the transforms and depends only on `core` and NumPy. It
+exists because a transform that emits `NaN`, collapses the dynamic range,
+desynchronises the mask, or crops away the only labelled structure does not
+raise — it silently poisons the dataset.
+
+`VolumeValidator` runs a configurable set of plausibility rules over a
+`MedVolume`, splitting findings into error- and warning-severity issues
+collected in a `ValidationReport`. Rules that need the pre-augmentation volume
+(label preservation, foreground loss, intensity drift) only fire when a
+`reference` is supplied.
+
+`Guard` is a `Transform` that wraps another transform (or a whole pipeline),
+validates its output against the input on every call, and reacts per
+`on_fail`: `raise`, `warn`, `revert` to the input, or `retry` with a fresh
+derived RNG stream. Because it is a `Transform`, it nests in the pipeline
+containers and round-trips through the serialisation `REGISTRY` — `from_dict`
+rebuilds its single wrapped transform and reconstructs the validator from its
+plain-dict config.

@@ -205,6 +205,7 @@ def test_registry_contains_all_known_transforms():
         "GhostingArtifact", "KSpaceDropout", "MRIMotion",
         "BeamHardening", "MetalStreak",
         "ScatterSimulation", "GridArtifact",
+        "Guard",
     }
     assert expected.issubset(set(REGISTRY.keys()))
 

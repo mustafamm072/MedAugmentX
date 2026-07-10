@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-07-09
+
+### Added
+
+- `medaugmentx.VolumeValidator` — a clinically-aware plausibility validator
+  that checks an augmented `MedVolume` for non-finite values, collapse to a
+  constant, mask/image shape desync, out-of-range intensity, foreground
+  fraction/loss, lost mask labels, and distribution drift. Comparative checks
+  run against the pre-augmentation volume when a reference is supplied.
+- `medaugmentx.Guard` — a drop-in `Transform` wrapper that validates the
+  output of any transform or pipeline on every call and, on failure, can
+  `raise`, `warn`, `revert` to the untouched input, or `retry` with fresh
+  randomness. Guards nest inside `Compose`/`OneOf`/`SomeOf` and round-trip
+  through JSON/YAML like every other transform.
+- `medaugmentx.ValidationReport`, `medaugmentx.ValidationIssue`, and
+  `medaugmentx.ValidationError` for reading and reacting to validation results.
+- `examples/safe_augmentation.py` demonstrating direct validation and all four
+  guard failure modes.
+
+### Changed
+
+- Version bumped to `0.8.0`.
+- `Guard` is registered in the serialisation `REGISTRY`; `from_dict` now
+  reconstructs its single wrapped transform and rebuilds its validator.
+
+### Fixed
+
+- README DOI badge now uses the Zenodo DOI-form URL
+  (`zenodo.org/badge/DOI/…`) so it renders the concept DOI instead of showing a
+  placeholder question mark.
+
+### Documentation
+
+- README, API reference, and the milestones roadmap document the new
+  validation and safe-augmentation workflow; the long-deferred "anatomical
+  plausibility validator" item is marked shipped.
+
 ## [0.7.0] — 2026-06-29
 
 ### Added
