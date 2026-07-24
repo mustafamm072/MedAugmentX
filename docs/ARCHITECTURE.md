@@ -52,17 +52,41 @@ class MedVolume:
     mask: Optional[np.ndarray]       # same shape as image, integer labels
     spacing: Tuple[float, ...]       # mm per axis, one entry per ndim
     metadata: Dict[str, Any]         # modality, vendor, original tags...
+    # Optional geometric targets, appended so the original positional
+    # signature (image, mask, spacing, metadata) is preserved:
+    keypoints: Optional[np.ndarray]  # (N, ndim) coords, array-index order
+    keypoint_labels: Optional[np.ndarray]  # (N,) parallel labels
+    bboxes: Optional[np.ndarray]     # (M, 2*ndim) = [min…, max…], array order
+    bbox_labels: Optional[np.ndarray]  # (M,) parallel labels
 ```
 
 Invariants enforced in `__post_init__`:
 
 - image is 2D or 3D,
 - mask, when present, has the same shape as image,
+- keypoints are `(N, ndim)`, bboxes are `(M, 2*ndim)` with `min <= max`,
+- labels, when present, are 1D with one entry per target,
 - spacing length matches image ndim (defaults to all-1.0 if omitted),
 - metadata is a dict.
 
-`replace()` returns a shallow copy with selected fields swapped. `copy()`
-deep-copies the arrays.
+`replace()` returns a shallow copy with selected fields swapped (`None` means
+"keep current", so an intensity transform that only rewrites the image carries
+mask and targets through unchanged). `copy()` deep-copies the arrays. `warp()`
+swaps in an already-transformed image while mapping targets through a coordinate
+function, and `remove_out_of_bounds_targets()` prunes off-frame targets.
+
+### Geometric targets (`core/geometry.py`)
+
+Keypoints and bounding boxes are optional, stored in **array-index order**
+(same as the image axes). `core/geometry.py` is a pure-NumPy module of *point
+maps* — `flip_map`, `affine_map`, `translate_map`, `scale_map`,
+`displacement_map` — plus `map_keypoints`/`map_bboxes`. A spatial transform
+expresses its pixel warp as one of these maps and hands it to `MedVolume.warp`,
+which applies it to keypoints and (via their `2**ndim` corners, re-bounded to a
+valid axis-aligned box) to bounding boxes. Labels ride along untouched.
+Intensity, artifact, and occlusion (`CoarseDropout`) transforms leave geometry —
+and therefore targets — unchanged. Targets are never dropped mid-transform;
+pruning is an explicit post-step.
 
 ### Axis convention
 

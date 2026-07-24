@@ -7,6 +7,7 @@ from typing import Any, Union
 
 import numpy as np
 
+from medaugmentx.core import geometry
 from medaugmentx.core.base import Transform
 from medaugmentx.core.utils import SeedLike, axis_label_to_index
 from medaugmentx.core.volume import MedVolume
@@ -64,7 +65,8 @@ class RandomFlip(Transform):
         flip_axes = tuple(flips)
         new_image = np.flip(volume.image, axis=flip_axes).copy()
         new_mask = None if volume.mask is None else np.flip(volume.mask, axis=flip_axes).copy()
-        return volume.replace(image=new_image, mask=new_mask)
+        point_map = geometry.flip_map(flip_axes, volume.shape)
+        return volume.warp(point_map, image=new_image, mask=new_mask)
 
     def to_dict(self) -> dict[str, Any]:
         return {

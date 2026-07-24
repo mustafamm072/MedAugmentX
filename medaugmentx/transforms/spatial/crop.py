@@ -6,6 +6,7 @@ from typing import Any
 
 import numpy as np
 
+from medaugmentx.core import geometry
 from medaugmentx.core.base import Transform
 from medaugmentx.core.utils import SeedLike
 from medaugmentx.core.volume import MedVolume
@@ -98,7 +99,11 @@ class AnatomicCrop(Transform):
         slices = tuple(slice(o, o + s) for o, s in zip(origin, size))
         new_image = volume.image[slices].copy()
         new_mask = None if volume.mask is None else volume.mask[slices].copy()
-        return volume.replace(image=new_image, mask=new_mask)
+        # Cropping shifts the coordinate origin by -origin. Targets that fall
+        # outside the new window keep faithful (possibly negative) coordinates;
+        # call MedVolume.remove_out_of_bounds_targets() to prune them.
+        point_map = geometry.translate_map(-np.asarray(origin, dtype=np.float64))
+        return volume.warp(point_map, image=new_image, mask=new_mask)
 
     def to_dict(self) -> dict[str, Any]:
         return {

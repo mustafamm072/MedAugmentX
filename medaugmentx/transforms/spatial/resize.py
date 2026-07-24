@@ -15,6 +15,7 @@ from typing import Any
 import numpy as np
 from scipy.ndimage import zoom
 
+from medaugmentx.core import geometry
 from medaugmentx.core.base import Transform
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
@@ -72,7 +73,9 @@ class Resize(Transform):
         new_spacing = tuple(
             sp * o / t for sp, o, t in zip(volume.spacing, old_shape, self.size)
         )
-        return volume.replace(
+        point_map = geometry.scale_map(np.asarray(factors, dtype=np.float64))
+        return volume.warp(
+            point_map,
             image=new_image.astype(np.float32, copy=False),
             mask=new_mask,
             spacing=new_spacing,
@@ -143,7 +146,11 @@ class Pad(Transform):
         if volume.mask is not None:
             new_mask = np.pad(volume.mask, widths, mode="constant", constant_values=0)
 
-        return volume.replace(image=new_image.astype(np.float32, copy=False), mask=new_mask)
+        before = np.asarray([b for b, _ in widths], dtype=np.float64)
+        point_map = geometry.translate_map(before)
+        return volume.warp(
+            point_map, image=new_image.astype(np.float32, copy=False), mask=new_mask
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -186,14 +193,17 @@ class CenterCrop(Transform):
                 f"size ndim ({len(self.size)}) does not match volume ndim ({volume.ndim})"
             )
         slices = []
+        starts = []
         for target, cur in zip(self.size, volume.shape):
             crop = min(target, cur)
             start = (cur - crop) // 2
+            starts.append(start)
             slices.append(slice(start, start + crop))
         region = tuple(slices)
         new_image = volume.image[region].copy()
         new_mask = None if volume.mask is None else volume.mask[region].copy()
-        return volume.replace(image=new_image, mask=new_mask)
+        point_map = geometry.translate_map(-np.asarray(starts, dtype=np.float64))
+        return volume.warp(point_map, image=new_image, mask=new_mask)
 
     def to_dict(self) -> dict[str, Any]:
         return {

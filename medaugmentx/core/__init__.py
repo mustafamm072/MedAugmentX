@@ -1,4 +1,5 @@
 """Core data model and pipeline primitives."""
+from medaugmentx.core import geometry
 from medaugmentx.core.base import Transform
 from medaugmentx.core.compose import Compose, OneOf, SomeOf
 from medaugmentx.core.utils import as_float32, derive_rng, resolve_rng
@@ -10,6 +11,7 @@ __all__ = [
     "Compose",
     "OneOf",
     "SomeOf",
+    "geometry",
     "as_float32",
     "derive_rng",
     "resolve_rng",

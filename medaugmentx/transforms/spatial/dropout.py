@@ -88,6 +88,8 @@ class CoarseDropout(Transform):
             if new_mask is not None:
                 new_mask[region] = 0
 
+        # Occlusion does not move the pixel grid, so keypoints/bboxes are
+        # geometrically unchanged and pass through untouched via ``replace``.
         return volume.replace(image=new_image, mask=new_mask)
 
     def to_dict(self) -> dict[str, Any]:

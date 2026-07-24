@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-07-23
+
+### Added
+
+- Keypoint and bounding-box targets on `MedVolume`. Every volume can now carry
+  `keypoints` (`(N, ndim)` landmark coordinates), `bboxes` (`(M, 2*ndim)`
+  axis-aligned boxes laid out as `[min…, max…]`), and optional parallel
+  `keypoint_labels` / `bbox_labels`. Coordinates use array-index order
+  (`(z, y, x)` for 3D, `(y, x)` for 2D) so they line up with the image axes.
+- Geometric targets are warped in lockstep with the image by every spatial
+  transform — `RandomFlip`, `RandomAffine`, `ElasticDeform`, `AnatomicCrop`,
+  `Resize`, `Pad`, and `CenterCrop`. Boxes are transformed via their corners
+  and re-bounded to a valid axis-aligned box, so they stay correct under
+  rotation. `CoarseDropout` and every intensity/artifact transform pass targets
+  through untouched.
+- `medaugmentx.core.geometry` — a dependency-free module of coordinate helpers
+  (`flip_map`, `affine_map`, `translate_map`, `scale_map`, `displacement_map`,
+  `map_keypoints`, `map_bboxes`) that custom spatial transforms can reuse.
+- `MedVolume.warp(point_map, *, image, mask=None, spacing=None)` — the single
+  entry point spatial transforms use to swap in a warped image while mapping
+  targets; `MedVolume.remove_out_of_bounds_targets(min_visibility=0.0)` prunes
+  keypoints that left the frame and clips/drops boxes after a crop, keeping
+  labels aligned.
+- `MedVolume` gains `has_keypoints`, `has_bboxes`, `num_keypoints`, and
+  `num_bboxes` conveniences; `repr` now reports target counts.
+- `examples/keypoints_bboxes.py` demonstrating landmark and box tracking
+  through a spatial pipeline.
+
+### Changed
+
+- Version bumped to `0.9.0`.
+- `MedVolume.replace()` and `MedVolume.copy()` now carry the four new target
+  fields; `None` still means "keep current", so intensity transforms preserve
+  targets automatically.
+
+### Notes
+
+- Modality-specific artifact transforms that resample voxels (`SlabShift`,
+  `AnisotropicElastic`) pass targets through unchanged for now — thread them
+  through `MedVolume.warp` if you need target tracking there.
+- Serialisation is unaffected: targets live on the volume, not on transforms,
+  so the JSON/YAML `REGISTRY` and round-trips are unchanged.
+
 ## [0.8.0] — 2026-07-09
 
 ### Added

@@ -412,3 +412,39 @@ c = Compose([GaussianNoise(std=0.05), GammaCorrection()], seed=42)(vol)
 d = Compose([GaussianNoise(std=0.05), GammaCorrection()], seed=42)(vol)
 assert np.array_equal(c.image, d.image)        # always passes
 ```
+
+---
+
+## 16. Track keypoints and bounding boxes
+
+```python
+import numpy as np
+from medaugmentx import Compose, MedVolume
+from medaugmentx.transforms import RandomAffine, RandomFlip, Resize
+
+# Coordinates are in array-index order: (y, x) for 2D, (z, y, x) for 3D.
+vol = MedVolume(
+    image=np.zeros((256, 256), dtype=np.float32),
+    keypoints=np.array([[120.0, 80.0]]),             # (y, x)
+    keypoint_labels=np.array(["landmark"]),
+    bboxes=np.array([[105.0, 65.0, 135.0, 95.0]]),   # [y_min, x_min, y_max, x_max]
+    bbox_labels=np.array(["lesion"]),
+)
+
+augment = Compose(
+    [RandomFlip(axes=("x",)), RandomAffine(rotation=20), Resize((512, 512))],
+    seed=7,
+)
+out = augment(vol)
+
+out.keypoints        # moved with the anatomy; labels ride along unchanged
+out.bboxes           # re-bounded to a valid axis-aligned box after rotation
+
+# A crop can push targets off-frame; transforms keep faithful coordinates.
+# Prune them explicitly when you need clean detection labels:
+clean = out.remove_out_of_bounds_targets(min_visibility=0.25)
+print(clean.num_keypoints, clean.num_bboxes)
+```
+
+Only spatial transforms move targets — intensity and artifact transforms
+(and `CoarseDropout`) pass them through untouched.

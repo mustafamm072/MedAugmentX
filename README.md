@@ -81,7 +81,7 @@ Verify the installation:
 
 ```python
 import medaugmentx
-print(medaugmentx.__version__)   # 0.8.0
+print(medaugmentx.__version__)   # 0.9.0
 ```
 
 ---
@@ -221,6 +221,44 @@ objects with `path`, `name`, `params`, and `depth`.
 
 ---
 
+## Detection & landmark targets
+
+`MedVolume` can carry **keypoints** (landmark coordinates) and **bounding
+boxes** alongside the image and mask. Every spatial transform warps them in
+lockstep with the pixels, so detection and landmark annotations stay aligned
+through the whole pipeline — no separate bookkeeping.
+
+```python
+import numpy as np
+from medaugmentx import Compose, MedVolume
+from medaugmentx.transforms import RandomFlip, RandomAffine, Resize
+
+vol = MedVolume(
+    image=np.zeros((256, 256), dtype=np.float32),
+    keypoints=np.array([[120.0, 80.0]]),          # (y, x) — array-index order
+    keypoint_labels=np.array(["nipple"]),
+    bboxes=np.array([[100.0, 60.0, 150.0, 110.0]]),  # [y_min, x_min, y_max, x_max]
+    bbox_labels=np.array(["mass"]),
+)
+
+augment = Compose([RandomFlip(axes=("x",)), RandomAffine(rotation=15), Resize((512, 512))], seed=0)
+out = augment(vol)
+
+out.keypoints    # moved with the anatomy; labels ride along unchanged
+out.bboxes       # re-bounded to a valid axis-aligned box after rotation
+```
+
+Coordinates are in **array-index order** — `(z, y, x)` for 3D, `(y, x)` for 2D —
+the same order used to index `image`, and boxes are `[min…, max…]`. Boxes are
+transformed via their corners and re-bounded, so they remain valid under
+rotation. Transforms map targets faithfully and never drop them; after a crop,
+`out.remove_out_of_bounds_targets()` prunes off-frame keypoints and clips or
+drops boxes, keeping labels aligned. Intensity and artifact transforms leave
+targets untouched. See
+[`examples/keypoints_bboxes.py`](examples/keypoints_bboxes.py).
+
+---
+
 ## Safe augmentation
 
 Augmentation can silently produce training-unusable volumes — `NaN` pixels, an
@@ -335,7 +373,7 @@ See [API examples](docs/API_EXAMPLES.md) and the [API reference](docs/API_REFERE
 
 | Component | Description |
 | --- | --- |
-| `MedVolume` | Container: image + optional mask + spacing + metadata |
+| `MedVolume` | Container: image + optional mask, keypoints, bounding boxes, spacing, metadata |
 | `Transform` | Abstract base — probability gating, seedable RNG, `to_dict()` |
 | `Compose` | Sequential pipeline with deterministic child seeding |
 | `OneOf` / `SomeOf` | Random selection from a set of transforms |
@@ -444,7 +482,7 @@ assert np.array_equal(a.image, b.image)  # always passes
 | --- | --- |
 | **1 — Core MVP** | ✅ Core data model, spatial/intensity transforms, DBT, DICOM/NIfTI I/O |
 | **2 — Modality artifacts & serialisation** | ✅ MRI (bias field, ghosting, k-space), CT (beam hardening), presets, JSON/YAML |
-| **3 — Framework interop, GPU backend, v1.0** | In progress: `0.8.0` adds plausibility validation and safe-augmentation guards; `0.7.0` added pipeline inspection for experiment logs and policy review; `0.6.0` added 14 transforms and a new X-ray modality module; `0.5.0` added custom-transform registration; `0.4.0` shipped TorchIO interop |
+| **3 — Framework interop, GPU backend, v1.0** | In progress: `0.9.0` adds keypoint & bounding-box targets warped through all spatial transforms; `0.8.0` added plausibility validation and safe-augmentation guards; `0.7.0` added pipeline inspection for experiment logs and policy review; `0.6.0` added 14 transforms and a new X-ray modality module; `0.5.0` added custom-transform registration; `0.4.0` shipped TorchIO interop |
 
 Detailed deliverables: [docs/MILESTONES.md](docs/MILESTONES.md).
 Developer API: [docs/API_REFERENCE.md](docs/API_REFERENCE.md).

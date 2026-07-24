@@ -1,6 +1,6 @@
 # API Reference
 
-Version: `0.8.0`
+Version: `0.9.0`
 
 This page documents the supported public imports. Prefer these paths in
 applications, papers, tutorials, and commercial code; internal module paths may
@@ -36,12 +36,27 @@ MedVolume(
     mask: np.ndarray | None = None,
     spacing: tuple[float, ...] = (),
     metadata: dict[str, Any] = {},
+    # Optional geometric targets (keyword-only in practice):
+    keypoints: np.ndarray | None = None,        # (N, ndim) coords
+    keypoint_labels: np.ndarray | None = None,  # (N,)
+    bboxes: np.ndarray | None = None,           # (M, 2*ndim) = [min…, max…]
+    bbox_labels: np.ndarray | None = None,      # (M,)
 )
 ```
+
+The `(image, mask, spacing, metadata)` positional signature is unchanged from
+earlier releases; the target fields were appended, so existing positional
+callers keep working.
 
 Container for one 2D `(H, W)` or 3D `(D, H, W)` medical image. `mask`, when
 provided, must match `image.shape`. `spacing` uses the same axis order as the
 image and defaults to `1.0` per axis.
+
+`keypoints` and `bboxes` are optional geometric targets in **array-index
+order** (`(z, y, x)` for 3D, `(y, x)` for 2D — the same order used to index
+`image`). Spatial transforms warp them in lockstep with the pixels; intensity
+and artifact transforms pass them through unchanged. See
+[Geometric targets](#geometric-targets).
 
 Useful properties and methods:
 
@@ -51,9 +66,39 @@ Useful properties and methods:
 | `volume.shape` | Image shape tuple |
 | `volume.is_3d` | True for `(D, H, W)` volumes |
 | `volume.has_mask` | True when a mask is attached |
+| `volume.has_keypoints` / `volume.has_bboxes` | True when targets are attached |
+| `volume.num_keypoints` / `volume.num_bboxes` | Target counts |
 | `volume.modality` | `metadata.get("modality")` |
 | `volume.replace(...)` | Return a copy with selected fields changed |
-| `volume.copy()` | Deep-copy arrays and metadata |
+| `volume.warp(point_map, *, image, mask=None, spacing=None)` | Swap in a warped image and map targets by a coordinate function |
+| `volume.remove_out_of_bounds_targets(min_visibility=0.0)` | Drop off-frame keypoints, clip/drop boxes; keeps labels aligned |
+| `volume.copy()` | Deep-copy arrays, targets, and metadata |
+
+#### Geometric targets
+
+Coordinates are stored in array-index order and float dtype. Boxes are laid out
+as `[min_axis0, …, max_axis0, …]`, low corner then high corner. Every spatial
+transform maps targets in lockstep with the image:
+
+| Transform | Effect on targets |
+| --- | --- |
+| `RandomFlip` | Reflect coordinates along the flipped axes |
+| `RandomAffine` | Forward affine map about the volume centre (+ translation) |
+| `ElasticDeform` | Sample the displacement field at each point |
+| `AnatomicCrop`, `CenterCrop` | Shift by the crop origin (may go negative) |
+| `Pad` | Shift by the pad width |
+| `Resize` | Scale by the per-axis zoom factor |
+| `CoarseDropout`, intensity/artifact transforms | Unchanged (pass through) |
+
+Boxes are mapped via their `2**ndim` corners and re-bounded to an axis-aligned
+box, so they remain valid under rotation. Transforms map targets faithfully and
+never drop them — after a crop, call `remove_out_of_bounds_targets()` to prune
+targets that left the frame.
+
+The `medaugmentx.core.geometry` module exposes the underlying point maps
+(`flip_map`, `affine_map`, `translate_map`, `scale_map`, `displacement_map`) and
+the mappers (`map_keypoints`, `map_bboxes`) for authors of custom spatial
+transforms; combine them with `MedVolume.warp`.
 
 ### `Transform`
 
@@ -160,8 +205,9 @@ from medaugmentx.transforms import RandomAffine, RicianNoise, BiasField
 | `Pad` | `size, mode="constant", cval=0.0, p=1.0, seed=None` |
 | `CenterCrop` | `size, p=1.0, seed=None` |
 
-Spatial transforms apply the same sampled geometry to `image` and `mask`, and
-use nearest-neighbour interpolation for masks. `Resize`/`Pad`/`CenterCrop` are
+Spatial transforms apply the same sampled geometry to `image`, `mask`, and any
+`keypoints`/`bboxes` (see [Geometric targets](#geometric-targets)), and use
+nearest-neighbour interpolation for masks. `Resize`/`Pad`/`CenterCrop` are
 deterministic shape-normalisation helpers (`Pad` never crops, `CenterCrop`
 never pads — pair them to force an exact shape).
 

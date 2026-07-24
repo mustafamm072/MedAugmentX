@@ -7,6 +7,7 @@ from typing import Any, Union
 import numpy as np
 from scipy.ndimage import gaussian_filter, map_coordinates
 
+from medaugmentx.core import geometry
 from medaugmentx.core.base import Transform
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
@@ -107,7 +108,8 @@ class ElasticDeform(Transform):
                 cval=0,
             ).reshape(shape).astype(volume.mask.dtype, copy=False)
             new_mask = warped_mask
-        return volume.replace(image=warped, mask=new_mask)
+        point_map = geometry.displacement_map(displacements, mode=self.mode)
+        return volume.warp(point_map, image=warped, mask=new_mask)
 
     def to_dict(self) -> dict[str, Any]:
         alpha = (

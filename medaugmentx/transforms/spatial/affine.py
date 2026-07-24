@@ -6,6 +6,7 @@ from typing import Any, Union
 import numpy as np
 from scipy.ndimage import affine_transform
 
+from medaugmentx.core import geometry
 from medaugmentx.core.base import Transform
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
@@ -122,7 +123,7 @@ class RandomAffine(Transform):
 
     def _build_matrix_offset(
         self, ndim: int, params: dict, shape: tuple[int, ...]
-    ) -> tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         if ndim == 3:
             R = self._rotation_matrix_3d(params["rotations_deg"])
         else:
@@ -140,11 +141,16 @@ class RandomAffine(Transform):
         # offset such that: input_coord = inverse @ output_coord + offset
         # producing rotation about the centre and the requested translation.
         offset = centre - inverse @ centre - inverse @ translation_px
-        return inverse, offset
+        # forward/centre/translation feed the keypoint & bbox point map: a
+        # feature at input p appears in the output at forward @ (p - centre)
+        # + centre + translation_px (the inverse of the pixel pull above).
+        return inverse, offset, forward, centre, translation_px
 
     def apply(self, volume: MedVolume) -> MedVolume:
         params = self._sample_params(volume.ndim)
-        matrix, offset = self._build_matrix_offset(volume.ndim, params, volume.shape)
+        matrix, offset, forward, centre, translation_px = self._build_matrix_offset(
+            volume.ndim, params, volume.shape
+        )
 
         image = as_float32(volume.image)
         new_image = affine_transform(
@@ -169,7 +175,8 @@ class RandomAffine(Transform):
                 output_shape=volume.mask.shape,
                 prefilter=False,
             ).astype(volume.mask.dtype, copy=False)
-        return volume.replace(image=new_image, mask=new_mask)
+        point_map = geometry.affine_map(forward, centre, translation_px)
+        return volume.warp(point_map, image=new_image, mask=new_mask)
 
     def to_dict(self) -> dict[str, Any]:
         return {
