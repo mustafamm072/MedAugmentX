@@ -1,449 +1,188 @@
-# API Reference
+# Public surface & semantics
 
-Version: `0.10.0`
+What is covered by compatibility guarantees, and the behaviour that spans more
+than one class and therefore has no single docstring to live in.
 
-This page documents the supported public imports. Prefer these paths in
-applications, papers, tutorials, and commercial code; internal module paths may
-move before `1.0`.
+**Signatures, parameters, and defaults are not on this page.** They are
+generated from the source, so they always match the version you have installed:
+
+- [Transform catalog](sphinx/catalog.rst) — every augmentation, what it
+  simulates, its knobs, and whether it moves annotations.
+- [API reference](sphinx/api/index.rst) — full docstrings for every public
+  class and function.
 
 ---
 
-## Core API
+## What is public
+
+Prefer these import paths in applications, papers, tutorials, and commercial
+code. Internal module paths may move before `1.0` without a deprecation cycle.
 
 ```python
-from medaugmentx import (
-    MedVolume,
-    Transform,
-    Compose,
-    OneOf,
-    SomeOf,
-    PipelineStep,
-    iter_pipeline,
-    pipeline_summary,
-    VolumeValidator,
-    Guard,
-    ValidationReport,
-    ValidationIssue,
-    ValidationError,
+from medaugmentx import (                # core data model and pipelines
+    MedVolume, Transform, Compose, OneOf, SomeOf,
+    PipelineStep, iter_pipeline, pipeline_summary,
+    VolumeValidator, Guard, ValidationReport, ValidationIssue, ValidationError,
 )
+from medaugmentx.transforms import ...   # all augmentations, flat namespace
+from medaugmentx.presets import ...      # mri_pipeline, ct_pipeline, dxr_pipeline, dbt_pipeline
+from medaugmentx.serialization import ...# REGISTRY, register_transform, to_json, from_json, to_yaml, from_yaml
+from medaugmentx.interop import ...      # SampleTransform, TorchTransform, MonaiMapTransform, TorchIOTransform
+from medaugmentx.io import ...           # load_dicom_series, load_nifti, save_nifti
+from medaugmentx.phantoms import ...     # mri_phantom, ct_phantom, xray_phantom, dbt_phantom
 ```
 
-### `MedVolume`
+One exception is `medaugmentx.core.geometry`, which is public for authors of
+custom spatial transforms — see [Geometric targets](#geometric-targets).
 
-```python
-MedVolume(
-    image: np.ndarray,
-    mask: np.ndarray | None = None,
-    spacing: tuple[float, ...] = (),
-    metadata: dict[str, Any] = {},
-    # Optional geometric targets (keyword-only in practice):
-    keypoints: np.ndarray | None = None,        # (N, ndim) coords
-    keypoint_labels: np.ndarray | None = None,  # (N,)
-    bboxes: np.ndarray | None = None,           # (M, 2*ndim) = [min…, max…]
-    bbox_labels: np.ndarray | None = None,      # (M,)
-)
-```
+`MedVolume`'s `(image, mask, spacing, metadata)` positional signature is
+unchanged from earlier releases. The target fields were appended after it, so
+existing positional callers keep working.
 
-The `(image, mask, spacing, metadata)` positional signature is unchanged from
-earlier releases; the target fields were appended, so existing positional
-callers keep working.
+---
 
-Container for one 2D `(H, W)` or 3D `(D, H, W)` medical image. `mask`, when
-provided, must match `image.shape`. `spacing` uses the same axis order as the
-image and defaults to `1.0` per axis.
+## Geometric targets
 
-`keypoints` and `bboxes` are optional geometric targets in **array-index
-order** (`(z, y, x)` for 3D, `(y, x)` for 2D — the same order used to index
-`image`). Spatial transforms warp them in lockstep with the pixels; intensity
-and artifact transforms pass them through unchanged. See
-[Geometric targets](#geometric-targets).
+`MedVolume` can carry `keypoints` and `bboxes` alongside the image and mask.
+This is the one piece of behaviour every spatial transform shares, so it is
+specified here rather than repeated in each docstring.
 
-Useful properties and methods:
+**Layout.** Coordinates are stored in **array-index order** and float dtype —
+`(z, y, x)` for 3D and `(y, x)` for 2D, the same order used to index `image`.
+Boxes are `(M, 2*ndim)`, laid out low corner first: `[min_axis0, …, max_axis0, …]`.
 
-| API | Description |
-| --- | --- |
-| `volume.ndim` | `2` or `3` |
-| `volume.shape` | Image shape tuple |
-| `volume.is_3d` | True for `(D, H, W)` volumes |
-| `volume.has_mask` | True when a mask is attached |
-| `volume.has_keypoints` / `volume.has_bboxes` | True when targets are attached |
-| `volume.num_keypoints` / `volume.num_bboxes` | Target counts |
-| `volume.modality` | `metadata.get("modality")` |
-| `volume.replace(...)` | Return a copy with selected fields changed |
-| `volume.warp(point_map, *, image, mask=None, spacing=None)` | Swap in a warped image and map targets by a coordinate function |
-| `volume.remove_out_of_bounds_targets(min_visibility=0.0)` | Drop off-frame keypoints, clip/drop boxes; keeps labels aligned |
-| `volume.copy()` | Deep-copy arrays, targets, and metadata |
-
-#### Geometric targets
-
-Coordinates are stored in array-index order and float dtype. Boxes are laid out
-as `[min_axis0, …, max_axis0, …]`, low corner then high corner. Every spatial
-transform maps targets in lockstep with the image:
+**Mapping.** Spatial transforms warp targets in lockstep with the pixels:
 
 | Transform | Effect on targets |
 | --- | --- |
 | `RandomFlip` | Reflect coordinates along the flipped axes |
-| `RandomAffine` | Forward affine map about the volume centre (+ translation) |
+| `RandomAffine` | Forward affine map about the volume centre, plus translation |
 | `ElasticDeform` | Sample the displacement field at each point |
 | `AnatomicCrop`, `CenterCrop` | Shift by the crop origin (may go negative) |
 | `Pad` | Shift by the pad width |
 | `Resize` | Align voxel centres using `(new_size - 1) / (old_size - 1)`; singleton axes map to zero |
 | `SlabShift` | Translate along the slice axis |
 | `CompressionVariation` | Scale about the volume centre on the compression axis |
-| `CoarseDropout`, intensity/artifact transforms | Unchanged (pass through) |
+| `CoarseDropout`, all intensity and artifact transforms | Unchanged (pass through) |
 
-Boxes are mapped via their `2**ndim` corners and re-bounded to an axis-aligned
-box, so they remain valid under rotation. For non-linear displacement fields,
-this is an approximation and may not enclose every warped interior point. Transforms map targets faithfully and
-never drop them — after a crop, call `remove_out_of_bounds_targets()` to prune
-targets that left the frame.
+The catalog's *Targets* column is generated from the code and is the
+authoritative version of this list.
 
-The `medaugmentx.core.geometry` module exposes the underlying point maps
+**Boxes under rotation.** A box is mapped through its `2**ndim` corners and
+re-bounded to an axis-aligned box, so it stays valid but may grow. For
+non-linear displacement fields this is an approximation: the result is not
+guaranteed to enclose every warped interior point.
+
+**Targets that leave the frame.** Transforms map targets faithfully and never
+drop them, because only the caller knows whether a partly-visible object should
+survive. After a crop, call
+`volume.remove_out_of_bounds_targets(min_visibility=0.0)` to drop off-frame
+keypoints and clip or discard boxes, keeping labels aligned.
+
+**Writing your own.** `medaugmentx.core.geometry` exposes the point maps
 (`flip_map`, `affine_map`, `translate_map`, `scale_map`, `displacement_map`) and
-the mappers (`map_keypoints`, `map_bboxes`) for authors of custom spatial
-transforms; combine them with `MedVolume.warp`.
-
-### `Transform`
-
-```python
-Transform(p: float = 1.0, seed: int | np.random.Generator | None = None)
-```
-
-Base class for all augmentations. Subclasses implement `apply(volume)` and use
-`self.rng` for all random sampling. Calling a transform validates that the
-input is a `MedVolume`, applies probability gating through `p`, and returns a
-new `MedVolume`.
-
-### Pipeline containers
-
-```python
-Compose(transforms, p=1.0, seed=None)
-OneOf(transforms, weights=None, p=1.0, seed=None)
-SomeOf(transforms, n=1, p=1.0, seed=None)
-```
-
-`Compose` applies children sequentially. `OneOf` chooses exactly one child.
-`SomeOf` chooses `n` children without replacement. All containers seed child
-transforms deterministically from the parent seed.
-
-### Pipeline inspection
-
-```python
-pipeline_summary(transform, max_value_length=72) -> str
-iter_pipeline(transform) -> Iterator[PipelineStep]
-```
-
-`pipeline_summary` returns a compact multi-line tree for a single transform or
-nested pipeline. It is intended for experiment logs, review notes, and saved
-augmentation policy summaries.
-
-`iter_pipeline` yields `PipelineStep` objects in depth-first order:
-
-| Field | Description |
-| --- | --- |
-| `path` | Tuple of child indices from the root; root is `()` |
-| `name` | Transform class name |
-| `params` | Parameters from `to_dict()`, excluding nested `transforms` |
-| `depth` | Nesting depth, equal to `len(path)` |
-
-### Validation & safe augmentation
-
-```python
-VolumeValidator(
-    *,
-    require_finite=True,           # no NaN/Inf                       -> error
-    forbid_constant=True,          # image not collapsed to a value   -> error
-    check_mask_shape=True,         # mask shape == image shape        -> error
-    intensity_bounds=None,         # (low, high) expected range       -> warning
-    strict_bounds=False,           # escalate bounds violation        -> error
-    min_foreground_fraction=None,  # absolute non-zero mask fraction  -> error
-    preserve_mask_labels=True,     # no labelled class fully lost*    -> error
-    max_foreground_loss=None,      # max relative foreground shrink*  -> error
-    max_intensity_shift=None,      # mean drift in reference σ*       -> warning
-).validate(volume, reference=None) -> ValidationReport
-
-Guard(
-    transform,
-    validator=None,                # VolumeValidator | dict | None (defaults)
-    on_fail="raise",               # "raise" | "warn" | "revert" | "retry"
-    retries=1,                     # total attempts in "retry" mode
-    p=1.0,
-    seed=None,
-) -> Transform
-```
-
-Checks marked `*` are comparative and only run when a `reference` volume is
-supplied; `Guard` passes the pre-augmentation volume automatically.
-
-`ValidationReport` is truthy when the volume passed (`report.ok`, i.e. no
-error-severity issues). It exposes `.issues`, `.errors`, and `.warnings` — each
-a tuple of `ValidationIssue(check, severity, message)` — and a readable
-`str()`. `Guard` in `on_fail="raise"` mode raises `ValidationError`, which
-carries the failing report on `.report`.
-
-`Guard` is a `Transform`: it nests inside pipeline containers and round-trips
-through the serialisation `REGISTRY` (its wrapped transform and validator are
-rebuilt by `from_dict`).
+the mappers (`map_keypoints`, `map_bboxes`). Build a point map, hand it to
+`MedVolume.warp` with the resampled image, and targets are carried for you.
 
 ---
 
-## Transform API
+## Randomness and reproducibility
 
-Use the flat transform namespace:
+Every transform accepts `seed`, and every container derives an **independent**
+stream per child rather than sharing one — so two identically-seeded transforms
+in the same `Compose` do not draw identical numbers.
 
-```python
-from medaugmentx.transforms import RandomAffine, RicianNoise, BiasField
-```
-
-### Spatial
-
-| Transform | Constructor summary |
-| --- | --- |
-| `RandomAffine` | `rotation=0.0, scale=(1.0, 1.0), translation=(0.0, 0.0), axes_enabled=("x", "y", "z"), order=1, mode="constant", cval=0.0, p=1.0, seed=None` |
-| `RandomFlip` | `axes=("x",), p_per_axis=0.5, p=1.0, seed=None` |
-| `AnatomicCrop` | `size, foreground_prob=0.5, foreground_threshold=0.0, p=1.0, seed=None` |
-| `ElasticDeform` | `alpha=30.0, sigma=4.0, order=1, mode="reflect", cval=0.0, p=1.0, seed=None` |
-| `CoarseDropout` | `num_holes=(1, 4), hole_size=(0.05, 0.2), fill_value=0.0, fill_mask=False, p=1.0, seed=None` |
-| `Resize` | `size, order=1, p=1.0, seed=None` |
-| `Pad` | `size, mode="constant", cval=0.0, p=1.0, seed=None` |
-| `CenterCrop` | `size, p=1.0, seed=None` |
-
-Spatial transforms apply the same sampled geometry to `image`, `mask`, and any
-`keypoints`/`bboxes` (see [Geometric targets](#geometric-targets)), and use
-nearest-neighbour interpolation for masks. `Resize`/`Pad`/`CenterCrop` are
-deterministic shape-normalisation helpers (`Pad` never crops, `CenterCrop`
-never pads — pair them to force an exact shape).
-
-### Intensity
-
-| Transform | Constructor summary |
-| --- | --- |
-| `GaussianNoise` | `std=0.01, relative=False, clip=None, p=1.0, seed=None` |
-| `RicianNoise` | `std=0.01, clip=None, p=1.0, seed=None` |
-| `GammaCorrection` | `gamma=(0.8, 1.2), invert=False, p=1.0, seed=None` |
-| `BiasField` | `alpha=0.3, coarse_shape=4, order=3, p=1.0, seed=None` |
-| `WindowLevel` | `center_shift_frac=0.1, width_scale=(0.8, 1.2), rescale_output=True, p=1.0, seed=None` |
-| `BrightnessContrast` | `brightness=0.0, contrast=(0.9, 1.1), clip=None, p=1.0, seed=None` |
-| `GaussianBlur` | `sigma=(0.5, 1.5), order=0, mode="reflect", p=1.0, seed=None` |
-| `MedianBlur` | `ksize=3, mode="reflect", p=1.0, seed=None` |
-| `SimulateLowResolution` | `zoom_range=(0.5, 0.9), order_down=1, order_up=1, per_axis=False, p=1.0, seed=None` |
-| `Sharpen` | `alpha=(0.2, 0.8), sigma=(0.7, 1.5), clip=None, p=1.0, seed=None` |
-| `CLAHEContrast` | `clip_limit=(1.0, 3.0), grid=(8, 8), n_bins=256, p=1.0, seed=None` |
-| `HistogramMatch` | `reference=None, blend=1.0, n_quantiles=256, p=1.0, seed=None` |
-
-Intensity transforms leave masks unchanged.
-
-### Modality-Specific
-
-| Modality | Transform | Constructor summary |
-| --- | --- | --- |
-| MRI | `GhostingArtifact` | `ghost_intensity=(0.05, 0.15), ghost_shift=(8, 32), phase_encode_axis="y", num_ghosts=1, p=1.0, seed=None` |
-| MRI | `KSpaceDropout` | `dropout_fraction=(0.01, 0.05), phase_encode_axis="y", p=1.0, seed=None` |
-| MRI | `MRIMotion` | `degrees=(1.0, 5.0), translation=(1.0, 4.0), num_movements=(1, 3), p=1.0, seed=None` |
-| CT | `BeamHardening` | `alpha=(0.02, 0.08), power=2.0, p=1.0, seed=None` |
-| CT | `MetalStreak` | `intensity=(0.1, 0.3), num_streaks=(6, 12), num_sources=1, falloff=0.5, p=1.0, seed=None` |
-| X-ray | `ScatterSimulation` | `fraction=(0.1, 0.4), sigma=(15.0, 40.0), p=1.0, seed=None` |
-| X-ray | `GridArtifact` | `amplitude=(0.03, 0.1), frequency=(0.2, 0.45), axis="x", p=1.0, seed=None` |
-| DBT | `SlabShift` | `max_shift=2, cval=0.0, p=1.0, seed=None` |
-| DBT | `LimitedAngleBlur` | `arc_degrees=(15.0, 25.0), base_sigma=1.0, reference_arc_deg=20.0, p=1.0, seed=None` |
-| DBT | `SliceDropout` | `num_slices=1, cval=0.0, affect_mask=False, p=1.0, seed=None` |
-| DBT | `AnisotropicElastic` | `alpha=(100.0, 100.0, 8.0), sigma=(8.0, 8.0, 2.0), order=1, p=1.0, seed=None` |
-| DBT | `CompressionVariation` | `scale=(0.85, 1.15), axis="y", order=1, p=1.0, seed=None` |
-| DBT | `ReconStreak` | `amplitude=(0.05, 0.2), num_planes=(1, 3), displacement=1.5, decay=0.6, axis="x", p=1.0, seed=None` |
+A serialised integer seed restarts the *original* draw sequence; it does not
+capture the RNG state at the moment of saving. Reloading a pipeline mid-run
+therefore replays that stream from the beginning rather than continuing it. For
+multi-worker data loaders and full replay, see the
+[research guide](RESEARCH_GUIDE.md).
 
 ---
 
-## Presets
+## Validation severity
 
-```python
-from medaugmentx.presets import mri_pipeline, ct_pipeline, dxr_pipeline, dbt_pipeline
-```
+`VolumeValidator` rules fall into two groups:
 
-| Factory | Returns |
-| --- | --- |
-| `mri_pipeline(seed=None)` | MRI spatial, bias-field, Rician noise, ghosting/k-space pipeline |
-| `ct_pipeline(seed=None)` | CT spatial, window/level, noise, beam-hardening pipeline |
-| `dxr_pipeline(seed=None)` | 2D digital X-ray pipeline |
-| `dbt_pipeline(seed=None)` | Digital breast tomosynthesis pipeline |
+- **Absolute** rules look at the augmented volume alone: finiteness, collapse to
+  a constant, mask shape, intensity bounds, minimum foreground fraction.
+- **Comparative** rules need the pre-augmentation volume — label preservation,
+  foreground loss, intensity drift. They are skipped unless you pass
+  `reference=` to `validate()`. `Guard` supplies it automatically.
 
-Each preset returns a serialisable `Compose`.
-
----
-
-## Serialisation
-
-```python
-from medaugmentx.serialization import REGISTRY, from_dict, to_json, from_json, to_yaml, from_yaml
-```
-
-| API | Description |
-| --- | --- |
-| `REGISTRY` | Maps transform class names to classes |
-| `register_transform(cls=None, *, name=None, override=False)` | Decorator that registers a custom transform class |
-| `from_dict(d)` | Reconstruct a transform from `transform.to_dict()` |
-| `to_json(transform, indent=2)` | Serialise a transform or pipeline to JSON |
-| `from_json(s)` | Reconstruct from JSON |
-| `to_yaml(transform)` | Serialise to YAML; requires `pyyaml` |
-| `from_yaml(s)` | Reconstruct from YAML; requires `pyyaml` |
-
-Text loaders accept up to 1,000,000 characters. Reconstruction rejects malformed
-structures, more than 64 nesting levels, or more than 10,000 transforms. Only
-registered Transform subclasses are constructed; custom registrations are
-trusted Python code. Saved integer seeds restart the original draw sequence,
-not the current RNG state. See [Security](../SECURITY.md).
-
-Custom transform classes can be registered with the `@register_transform`
-decorator (which validates the class and guards against name collisions) or by
-direct assignment, `REGISTRY["MyTransform"] = MyTransform`.
+A `ValidationReport` is truthy when the volume passed, meaning it carries no
+error-severity issues. Bounds violations are warnings by default and become
+errors under `strict_bounds=True`. In `on_fail="raise"` mode `Guard` raises
+`ValidationError`, which carries the failing report on `.report`.
 
 ---
 
-## Framework Interop
+## Serialisation limits
 
-```python
-from medaugmentx.interop import (
-    SampleTransform,
-    TorchTransform,
-    MonaiMapTransform,
-    TorchIOTransform,
-)
-```
+Pipelines round-trip through JSON and YAML so the exact augmentation policy can
+be committed next to a set of results. Loading enforces hard limits: at most
+1,000,000 characters of text, 64 levels of nesting, and 10,000 transforms.
+Malformed structures are rejected rather than partially constructed.
 
-### `SampleTransform`
+Only classes present in `REGISTRY` are ever instantiated. Registering a custom
+transform makes its constructor reachable by name from any document you load —
+custom registrations are trusted Python code, so treat pipeline files from
+outside your project as executable input. See the
+[security policy](../SECURITY.md).
 
-```python
-SampleTransform(
-    transform,
-    image_key="image",
-    mask_key="mask",
-    spacing_key="spacing",
-    metadata_key="metadata",
-    channel_dim="auto",
-    preserve_image_dtype=False,
-    preserve_mask_dtype=True,
-)
-```
+---
 
-Adapts any MedAugmentX `Transform` or `Compose` to common dataset sample
-formats:
+## Framework interop
+
+The adapters accept the sample shapes each framework uses and return the same
+kind they were given:
 
 | Input | Output |
 | --- | --- |
 | `MedVolume` | `MedVolume` |
-| `np.ndarray` or `torch.Tensor` image | same array/tensor kind |
-| `(image, mask)` tuple/list | same tuple/list kind |
-| mapping with `image_key` and optional `mask_key` | shallow-copied mapping |
+| `np.ndarray` or `torch.Tensor` image | Same array or tensor kind |
+| `(image, mask)` tuple or list | Same tuple or list kind |
+| Mapping with `image_key` and optional `mask_key` | Shallow-copied mapping |
+| TorchIO `Subject` | `Subject`, with augmented data written back |
 
-`channel_dim` may be `None`, `"auto"`, `"first"`, `"last"`, or an integer
-axis. MedAugmentX operates on single-channel 2D/3D data; singleton channel
-dimensions are stripped before augmentation and restored after augmentation.
+MedAugmentX operates on single-channel 2D and 3D data. `channel_dim` — `None`,
+`"auto"`, `"first"`, `"last"`, or an integer axis — says where the adapter
+should expect a singleton channel dimension; it is stripped before augmentation
+and restored afterwards.
 
-### `TorchTransform`
+For a TorchIO `Subject`, explicit `image_key` and `label_key` are used when
+present; otherwise the adapter infers a unique non-label image key and a unique
+label-like key. Pass explicit keys for multi-image subjects.
 
-PyTorch/torchvision-friendly alias of `SampleTransform`. Importing it does not
-import torch; tensor support is activated only when a torch tensor is passed.
-
-### `MonaiMapTransform`
-
-```python
-MonaiMapTransform(
-    transform,
-    image_key="image",
-    label_key="label",
-    spacing_key="spacing",
-    metadata_key="metadata",
-    channel_dim="auto",
-    preserve_image_dtype=False,
-    preserve_label_dtype=True,
-)
-```
-
-Dictionary adapter with MONAI-style `image` / `label` defaults.
-
-### `TorchIOTransform`
-
-```python
-TorchIOTransform(
-    transform,
-    image_key="image",
-    label_key="label",
-    channel_dim=0,
-    preserve_image_dtype=False,
-    preserve_label_dtype=True,
-    copy=True,
-)
-```
-
-TorchIO `Subject` adapter. It reads one intensity image and one optional label
-map from image-like objects with `.data`, runs the MedAugmentX transform, and
-writes augmented data back to the returned subject.
-
-`image_key` and `label_key` may be explicit strings. If `image_key` is absent
-from the subject, the adapter infers a unique non-label image key. If
-`label_key` is absent, it infers a unique label-like key when present. Pass
-explicit keys for multi-image subjects.
-
-Importing `TorchIOTransform` does not import TorchIO; install TorchIO only
-when your pipeline needs it with `pip install "medaugmentx[torchio]"`.
+Importing an adapter never imports its framework. Torch, MONAI, and TorchIO are
+touched only when a sample of that kind actually passes through.
 
 ---
 
-## I/O
+## Optional extras
 
-```python
-from medaugmentx.io import load_dicom_series, load_nifti, save_nifti
-```
+The core install is NumPy and SciPy only. Everything else is opt-in:
 
-| API | Extra | Description |
+| Extra | Installs | Needed for |
 | --- | --- | --- |
-| `load_dicom_series(path)` | `dicom` | Load a DICOM directory or file into `MedVolume` |
-| `load_nifti(path)` | `nifti` | Load `.nii` / `.nii.gz` into `MedVolume` |
-| `save_nifti(volume, path)` | `nifti` | Save a `MedVolume` to NIfTI |
-
-Install optional I/O support with `pip install "medaugmentx[io]"`.
-
----
-
-## Synthetic Phantoms
-
-```python
-from medaugmentx.phantoms import ct_phantom, dbt_phantom, mri_phantom, xray_phantom
-```
-
-| API | Returns | Description |
-| --- | --- | --- |
-| `mri_phantom(size=256)` | 2D `MedVolume` | Axial brain-like slice, arbitrary units in `[0, 1]` |
-| `ct_phantom(size=256)` | 2D `MedVolume` | Axial abdomen-like slice in approximate Hounsfield units |
-| `xray_phantom(size=256)` | 2D `MedVolume` | Chest-radiograph-like projection, arbitrary units |
-| `dbt_phantom(seed=2026)` | 3D `MedVolume` | `(64, 128, 256)` tomosynthesis volume, spacing `(1.0, 0.5, 0.25)` |
-
-Generated from analytic shapes and a fixed seed — no patient data, downloads,
-or network access, and identical across machines. They are illustrations, not
-validated models of anatomy or scanner physics; do not draw clinical
-conclusions from them. Requires no extra beyond the core install.
+| `dicom` | `pydicom` | `load_dicom_series` |
+| `nifti` | `nibabel` | `load_nifti`, `save_nifti` |
+| `io` | `pydicom`, `nibabel` | Both readers |
+| `yaml` | `pyyaml` | `to_yaml`, `from_yaml` |
+| `torch` | `torch` | `TorchTransform` with tensors |
+| `monai` | `monai` | MONAI dictionary pipelines |
+| `torchio` | `torchio` | `TorchIOTransform` |
+| `frameworks` | `torch`, `monai`, `torchio` | All three |
+| `notebooks` | `matplotlib`, `nbformat`, `nbclient`, `ipykernel` | Running the tutorials |
+| `docs` | `sphinx`, `myst-parser`, `furo` | Building this site |
 
 ---
 
-## Optional Extras
-
-| Extra | Installs |
-| --- | --- |
-| `dicom` | `pydicom` |
-| `nifti` | `nibabel` |
-| `io` | `pydicom`, `nibabel` |
-| `yaml` | `pyyaml` |
-| `notebooks` | `matplotlib`, `nbformat`, `nbclient`, `ipykernel` |
-| `torch` | `torch` |
-| `monai` | `monai` |
-| `torchio` | `torchio` |
-| `frameworks` | `torch`, `monai`, `torchio` |
-
----
-
-## Operational Docs
+## Related
 
 | Document | Use |
 | --- | --- |
-| [Commercial adoption](COMMERCIAL_ADOPTION.md) | Intended use, validation, audit trail, privacy, and dependency guidance |
-| [Architecture](ARCHITECTURE.md) | Layering, public surface, contracts, and dependency boundaries |
-| [Security policy](../SECURITY.md) | Vulnerability reporting, PHI handling, supported versions, and dependency posture |
+| [Commercial adoption](COMMERCIAL_ADOPTION.md) | Intended use, validation, audit trail, privacy, dependency guidance |
+| [Architecture](ARCHITECTURE.md) | Layering, contracts, dependency boundaries, testing strategy |
+| [Research guide](RESEARCH_GUIDE.md) | Replay, worker seeds, evaluation reporting, citation |
+| [Security policy](../SECURITY.md) | Vulnerability reporting, PHI handling, dependency posture |

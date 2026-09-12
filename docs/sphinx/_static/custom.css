@@ -1,0 +1,18 @@
+/* Small adjustments on top of Furo, kept deliberately minimal. */
+
+/* The catalog and reference tables are wide by design. Let them scroll inside
+   their own box instead of stretching the page on narrow screens. */
+.table-wrapper {
+  overflow-x: auto;
+}
+
+/* Transform names in the catalog are cross-references; keep them on one line so
+   the first column stays scannable. */
+table.docutils td:first-child > p > a code {
+  white-space: nowrap;
+}
+
+/* Parameter lists in the catalog run together otherwise. */
+table.docutils td code.literal {
+  white-space: nowrap;
+}

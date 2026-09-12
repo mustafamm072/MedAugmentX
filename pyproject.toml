@@ -50,7 +50,7 @@ dependencies = [
 dicom = ["pydicom>=2.3"]
 nifti = ["nibabel>=4.0"]
 io = ["pydicom>=2.3", "nibabel>=4.0"]
-docs = ["sphinx>=7,<9", "myst-parser>=2,<5"]
+docs = ["sphinx>=7,<9", "myst-parser>=2,<5", "furo>=2024.1"]
 notebooks = ["matplotlib>=3.5", "nbformat>=5.7", "nbclient>=0.7", "ipykernel>=6.20"]
 test = [
     "pytest>=7.0",

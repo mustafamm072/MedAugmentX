@@ -98,7 +98,7 @@ teams:
   transform parameters.
 - **Typed package:** ships `py.typed` for downstream type checkers.
 - **Clear adoption guidance:** see [Commercial adoption](docs/COMMERCIAL_ADOPTION.md),
-  [Documentation](docs/README.md), and [Security](SECURITY.md).
+  [Documentation](https://mustafamm072.github.io/MedAugmentX/), and [Security](SECURITY.md).
 
 Teams using MedAugmentX in regulated or customer-facing products should
 validate augmentation policies on their own data, version-control pipeline
@@ -415,7 +415,8 @@ augment = TorchIOTransform(mri_pipeline(seed=None), image_key="t1", label_key="s
 subject = augment(subject)
 ```
 
-See [API examples](docs/API_EXAMPLES.md) and the [API reference](docs/API_REFERENCE.md).
+See [API examples](docs/API_EXAMPLES.md) and the
+[API reference](https://mustafamm072.github.io/MedAugmentX/docs/sphinx/api/index.html).
 
 ---
 
@@ -542,7 +543,8 @@ experiment records, evaluation reporting, and citation.
 | **3 — Framework interop, GPU backend, v1.0** | In progress: `0.10.0` adds a searchable documentation site, reproducibility and citation metadata, packaging checks, and a round of correctness fixes; `0.9.0` added keypoint & bounding-box targets warped through all spatial transforms; `0.8.0` added plausibility validation and safe-augmentation guards; `0.7.0` added pipeline inspection for experiment logs and policy review; `0.6.0` added 14 transforms and a new X-ray modality module; `0.5.0` added custom-transform registration; `0.4.0` shipped TorchIO interop |
 
 Detailed deliverables: [docs/MILESTONES.md](docs/MILESTONES.md).
-Developer API: [docs/API_REFERENCE.md](docs/API_REFERENCE.md).
+Developer API: the [transform catalog](https://mustafamm072.github.io/MedAugmentX/docs/sphinx/catalog.html)
+and [API reference](https://mustafamm072.github.io/MedAugmentX/docs/sphinx/api/index.html).
 
 ---
 

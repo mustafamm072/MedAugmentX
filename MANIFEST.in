@@ -4,7 +4,7 @@ include CONTRIBUTING.md
 include LICENSE
 include SECURITY.md
 include CITATION.cff
-recursive-include docs *.md *.rst *.py *.html
+recursive-include docs *.md *.rst *.py *.html *.css
 recursive-include docs/assets *.png *.json
 recursive-include examples *.md *.py
 recursive-include notebooks *.md *.py *.ipynb

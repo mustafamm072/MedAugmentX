@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Generated API reference. `sphinx.ext.autodoc` + `napoleon` now render every
+  public class and function from its own docstring, across five pages: core data
+  model, transforms, presets/serialisation/inspection, validation, and
+  I/O/interop/phantoms. Signatures, parameter types, and defaults come from the
+  source, so they describe the installed version rather than whatever was last
+  transcribed by hand.
+- Generated transform catalog at `docs/sphinx/catalog.rst` — a scannable table
+  per modality giving each transform's summary, parameters, and whether it warps
+  keypoints and boxes. Built by the new `docs/sphinx/_ext/mx_catalog.py`
+  extension, which reads `medaugmentx.transforms.__all__`, the class docstrings,
+  the constructor signatures, and (for the targets column) whether the defining
+  module uses `medaugmentx.core.geometry`. Adding a transform is enough to make
+  it appear.
+- `tests/test_docs.py` guards what the generated pages read: every exported
+  transform must fall into a catalog category, carry a summary sentence, and
+  document each of its constructor parameters. The targets column is checked
+  against the behaviour specified in `docs/API_REFERENCE.md`.
+- Furo theme (`docs` extra) supplying grouped sidebar navigation, full-text
+  search, light/dark switching, per-page contents, and working "Edit this page"
+  links.
 - Jupyter tutorials for MRI, CT, and tomosynthesis in `notebooks/`, covering the
   modality-specific reasoning behind each transform plus mask alignment,
   seeding, guarding, and policy serialisation (roadmap 3.14).
@@ -32,6 +52,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The documentation site is organised by task rather than presented as a flat
+  list of files. The landing page orients the reader and routes them from a
+  goal to a page; the sidebar groups everything under Getting started,
+  Reference, Guides, and Project.
+- `docs/API_REFERENCE.md` is now *Public surface & semantics*. Its
+  constructor-signature tables — which duplicated the code and had to be updated
+  by hand on every change — were removed in favour of the generated pages, and
+  what remains is the behaviour that spans several classes: geometric target
+  layout and mapping, seeding guarantees, validation severity, serialisation
+  limits, interop sample shapes, and the extras table.
+- `docs/README.md` is now a guide to working on the documentation — how the
+  site is assembled, what is generated versus hand-written, and how to add a
+  page — instead of a second copy of the site's navigation.
+- Releases no longer require editing a version line in `docs/API_REFERENCE.md`;
+  the site reads its version from the installed package. `CONTRIBUTING.md`'s
+  release checklist drops from six files to five.
 - `examples/generate_readme_gallery.py` imports its phantoms from
   `medaugmentx.phantoms` instead of defining them inline. Gallery output is
   byte-identical.

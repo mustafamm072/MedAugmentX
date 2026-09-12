@@ -203,16 +203,19 @@ outside the source checkout, so editable imports cannot hide packaging errors.
 
 ## Releasing
 
-The version number is recorded in six places and they must agree:
+The version number is recorded in five places and they must agree:
 
 | File | Field |
 | --- | --- |
 | `pyproject.toml` | `project.version` |
 | `medaugmentx/__init__.py` | `__version__` |
 | `CITATION.cff` | `version`, `date-released` |
-| `docs/API_REFERENCE.md` | the `Version:` line |
 | `README.md` | the `print(medaugmentx.__version__)` comment |
 | `CHANGELOG.md` | the new `## [x.y.z] — YYYY-MM-DD` heading |
+
+The documentation site reads its version from the installed package, and its
+API pages are generated from the source, so nothing under `docs/` needs a
+version bump by hand.
 
 Move the `## [Unreleased]` entries under the new heading and leave
 `[Unreleased]` empty at the top. Also update the README's Phase-3 status row

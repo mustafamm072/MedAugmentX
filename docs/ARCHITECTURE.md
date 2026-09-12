@@ -328,8 +328,10 @@ local clinical, security, privacy, and regulatory validation. See
 The flat re-export in `medaugmentx/transforms/__init__.py` is the canonical
 import path. Internal modules (`medaugmentx/transforms/intensity/bias_field.py`,
 etc.) may move between minor versions; the public surface follows SemVer once
-we hit `1.0`. The developer-facing reference lives in
-[API_REFERENCE.md](API_REFERENCE.md).
+we hit `1.0`. What that surface covers, and the semantics shared across it, are
+in [Public surface & semantics](API_REFERENCE.md); the generated
+[transform catalog](sphinx/catalog.rst) and [API reference](sphinx/api/index.rst)
+carry the signatures.
 
 ---
 
