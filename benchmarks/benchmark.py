@@ -1,32 +1,26 @@
-"""Speed benchmark for MedAugmentX transforms.
+"""Measure transform latency and memory in isolated processes; emit auditable JSON."""
 
-Times each registered leaf transform on a representative volume and prints a
-table sorted by best wall-clock time. Use this to spot regressions and to
-check the Phase-3 acceptance target: every transform should complete in
-< 500 ms on CPU for a 512x512x80 DBT volume.
-
-Usage::
-
-    python benchmarks/benchmark.py                  # default 64x256x256 volume
-    python benchmarks/benchmark.py --shape 80 512 512   # acceptance-target size
-    python benchmarks/benchmark.py --repeats 5 --shape 256 256
-
-The benchmark uses only NumPy/SciPy — no optional dependencies required.
-"""
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
+import json
+import os
+import platform
+import subprocess
+import sys
 import time
+import tracemalloc
+from pathlib import Path
 
 import numpy as np
+import scipy
 
-from medaugmentx import MedVolume
+from medaugmentx import MedVolume, __version__
 from medaugmentx.serialization import REGISTRY
 
-# Containers and transforms that need a reference / nested transforms are skipped.
-_SKIP = {"Compose", "OneOf", "SomeOf", "Guard", "HistogramMatch"}
-
-# Transforms that require a 3D volume.
+_SKIP = {"Compose", "OneOf", "SomeOf", "Guard"}
 _REQUIRE_3D = {
     "SlabShift",
     "LimitedAngleBlur",
@@ -35,88 +29,126 @@ _REQUIRE_3D = {
     "CompressionVariation",
     "ReconStreak",
 }
+_THREAD_KEYS = (
+    "OMP_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "VECLIB_MAXIMUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+)
 
 
-def _make_volume(shape: tuple[int, ...]) -> MedVolume:
-    rng = np.random.default_rng(0)
-    image = rng.random(shape, dtype=np.float64).astype(np.float32)
-    mask = (image > 0.7).astype(np.uint8)
-    spacing = (1.0, 0.1, 0.1) if len(shape) == 3 else (0.1, 0.1)
-    return MedVolume(image=image, mask=mask, spacing=spacing, metadata={"modality": "DBT"})
-
-
-def _time_transform(name: str, cls: type, volume: MedVolume, repeats: int) -> float | None:
+def measure(name: str, shape: tuple[int, ...], repeats: int) -> dict:
+    image = np.random.default_rng(0).random(shape).astype(np.float32)
+    volume = MedVolume(
+        image,
+        mask=(image > 0.7).astype(np.uint8),
+        spacing=(1.0, 0.5, 0.5) if len(shape) == 3 else (0.5, 0.5),
+    )
     kwargs = {"p": 1.0, "seed": 0}
-    shape_factors = {"AnatomicCrop": 0.5, "CenterCrop": 0.5, "Resize": 0.625, "Pad": 1.5}
-    if name in shape_factors:
-        kwargs["size"] = tuple(max(1, round(s * shape_factors[name])) for s in volume.shape)
-    kwargs.setdefault("p", 1.0)
-    kwargs.setdefault("seed", 0)
-    try:
-        transform = cls(**kwargs)
-    except Exception as exc:  # pragma: no cover - defensive
-        print(f"  ! could not construct {name}: {exc}")
-        return None
-
-    # Warm-up (JIT-free, but primes caches / first-call allocations).
-    transform(volume)
-
-    best = float("inf")
+    factors = {"AnatomicCrop": 0.5, "CenterCrop": 0.5, "Resize": 0.625, "Pad": 1.5}
+    if name in factors:
+        kwargs["size"] = tuple(max(1, round(s * factors[name])) for s in shape)
+    if name == "HistogramMatch":
+        kwargs["reference_quantiles"] = np.linspace(0, 1, 256).tolist()
+    transform = REGISTRY[name](**kwargs)
+    transform(volume)  # warm-up excluded
+    timings = []
     for _ in range(repeats):
         start = time.perf_counter()
         transform(volume)
-        best = min(best, time.perf_counter() - start)
-    return best * 1000.0  # ms
+        timings.append((time.perf_counter() - start) * 1000)
+    tracemalloc.start()
+    transform(volume)
+    _, tracked_peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    rss_bytes = None
+    try:
+        import resource
+
+        rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        rss_bytes = int(rss if sys.platform == "darwin" else rss * 1024)
+    except ImportError:
+        pass
+    return {
+        "name": name,
+        "policy": transform.to_dict(),
+        "latency_ms": timings,
+        "median_ms": float(np.median(timings)),
+        "p95_ms": float(np.percentile(timings, 95)),
+        "tracked_peak_bytes": tracked_peak,
+        "process_peak_rss_bytes": rss_bytes,
+    }
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--shape",
-        type=int,
-        nargs="+",
-        default=[64, 256, 256],
-        help="Volume shape (2 or 3 ints). Default: 64 256 256.",
-    )
-    parser.add_argument("--repeats", type=int, default=3, help="Timed runs per transform.")
+    parser.add_argument("--shape", nargs="+", type=int, default=[64, 256, 256])
+    parser.add_argument("--repeats", type=int, default=5)
+    parser.add_argument("--threads", type=int, default=1)
+    parser.add_argument("--names", nargs="+")
+    parser.add_argument("--json", type=Path)
+    parser.add_argument("--worker", help=argparse.SUPPRESS)
     args = parser.parse_args()
-
-    if len(args.shape) not in (2, 3) or any(s <= 0 for s in args.shape):
-        parser.error("--shape requires two or three positive integers")
-    if args.repeats < 1:
-        parser.error("--repeats must be positive")
-    shape = tuple(args.shape)
-    volume = _make_volume(shape)
-    is_3d = len(shape) == 3
-
-    print(f"MedAugmentX benchmark — volume shape {shape}, {args.repeats} repeats (best of)\n")
-    results: list[tuple[str, float]] = []
-    for name in sorted(REGISTRY):
-        if name in _SKIP:
+    if len(args.shape) not in (2, 3) or min(args.shape) < 1 or min(args.repeats, args.threads) < 1:
+        parser.error("shape needs 2/3 positive axes; repeats and threads must be positive")
+    if args.worker:
+        print(json.dumps(measure(args.worker, tuple(args.shape), args.repeats)))
+        return
+    names = args.names or sorted(set(REGISTRY) - _SKIP)
+    if set(names) - (set(REGISTRY) - _SKIP):
+        parser.error("names must be registered leaf transforms")
+    env = {**os.environ, **dict.fromkeys(_THREAD_KEYS, str(args.threads))}
+    results = []
+    for name in names:
+        if len(args.shape) == 2 and name in _REQUIRE_3D:
             continue
-        if name in _REQUIRE_3D and not is_3d:
-            continue
-        cls = REGISTRY[name]
-        ms = _time_transform(name, cls, volume, args.repeats)
-        if ms is not None:
-            results.append((name, ms))
-
-    results.sort(key=lambda r: r[1], reverse=True)
-    width = max(len(n) for n, _ in results)
-    print(f"{'transform':<{width}}   time (ms)")
-    print("-" * (width + 13))
-    over_budget = []
-    for name, ms in results:
-        flag = "  <-- > 500 ms" if ms > 500 else ""
-        if ms > 500:
-            over_budget.append(name)
-        print(f"{name:<{width}}   {ms:8.2f}{flag}")
-
-    print()
-    if over_budget:
-        print(f"{len(over_budget)} transform(s) exceeded the 500 ms target: {', '.join(over_budget)}")
-    else:
-        print("All transforms completed within the 500 ms CPU target.")
+        command = [
+            sys.executable,
+            str(Path(__file__).resolve()),
+            "--worker",
+            name,
+            "--repeats",
+            str(args.repeats),
+            "--shape",
+            *map(str, args.shape),
+        ]
+        result = subprocess.run(command, env=env, capture_output=True, text=True, check=True)
+        row = json.loads(result.stdout)
+        results.append(row)
+        print(f"{name:25s} median {row['median_ms']:9.2f} ms | p95 {row['p95_ms']:9.2f} ms")
+    config = io.StringIO()
+    with contextlib.redirect_stdout(config):
+        np.show_config()
+    report = {
+        "schema_version": 1,
+        "environment": {
+            "medaugmentx": __version__,
+            "python": platform.python_version(),
+            "numpy": np.__version__,
+            "scipy": scipy.__version__,
+            "platform": platform.platform(),
+            "machine": platform.machine(),
+            "processor": platform.processor(),
+            "logical_cpus": os.cpu_count(),
+            "thread_environment": {k: env[k] for k in _THREAD_KEYS},
+            "numpy_build_config": config.getvalue(),
+        },
+        "input": {
+            "shape": args.shape,
+            "dtype": "float32",
+            "mask": "uint8",
+            "targets": False,
+            "seed": 0,
+            "repeats": args.repeats,
+            "warmups": 1,
+        },
+        "memory_scope": "Separate extra draw: tracemalloc peak; isolated process lifetime RSS includes interpreter, imports, input, warm-up and measurements. RSS unavailable on Windows.",
+        "results": results,
+    }
+    if args.json:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(json.dumps(report, indent=2) + "\n")
 
 
 if __name__ == "__main__":

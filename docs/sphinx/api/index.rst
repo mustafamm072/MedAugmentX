@@ -5,8 +5,7 @@ Signatures and prose on these pages are generated from the source at build time,
 so they always describe the version of MedAugmentX you are reading the docs for.
 Use the sidebar, the search box, or the :ref:`index <genindex>` to find a symbol.
 
-The import paths shown here are the supported ones. Internal module paths may
-move before ``1.0``; see :doc:`../../API_REFERENCE` for the stability policy and
+The import paths shown here are the supported ones. Version 1 public imports follow semantic versioning; see :doc:`../../API_REFERENCE` for the stability policy and
 the semantics that span more than one class.
 
 .. list-table::

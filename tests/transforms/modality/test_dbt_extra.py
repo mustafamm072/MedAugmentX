@@ -20,6 +20,7 @@ def vol2d():
 
 # ---- CompressionVariation ----
 
+
 def test_compression_shape_preserved(dbt_vol):
     out = CompressionVariation(scale=0.85, seed=0)(dbt_vol)
     assert out.image.shape == dbt_vol.image.shape
@@ -70,6 +71,7 @@ def test_compression_to_dict_round_trip():
 
 # ---- ReconStreak ----
 
+
 def test_recon_shape_dtype(dbt_vol):
     out = ReconStreak(seed=0)(dbt_vol)
     assert out.image.shape == dbt_vol.image.shape
@@ -112,7 +114,9 @@ def test_recon_invalid_params_raise():
 
 
 def test_recon_to_dict_round_trip():
-    t = ReconStreak(amplitude=(0.05, 0.2), num_planes=(1, 3), displacement=1.5, decay=0.6, axis="x", p=0.5)
+    t = ReconStreak(
+        amplitude=(0.05, 0.2), num_planes=(1, 3), displacement=1.5, decay=0.6, axis="x", p=0.5
+    )
     d = t.to_dict()
     assert d["name"] == "ReconStreak"
     t2 = ReconStreak(**d["params"])

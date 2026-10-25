@@ -1,4 +1,5 @@
 """The MedVolume container — image + optional mask + spacing + metadata."""
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -9,6 +10,7 @@ import numpy as np
 
 from medaugmentx.core import geometry
 from medaugmentx.core.geometry import PointMap
+from medaugmentx.core.physical import affine_spacing, axis_permutation, validate_affine
 
 
 @dataclass
@@ -42,6 +44,9 @@ class MedVolume:
         metadata: Free-form dictionary. Conventional keys: ``modality``
             (``"MR" | "CT" | "DX" | "DBT"``), ``vendor``, ``patient_id``,
             ``original_dtype``.
+        affine: Optional 4x4 matrix mapping **array-axis** voxel centres to
+            RAS patient coordinates in millimetres. ``None`` means patient
+            geometry is unknown. Spacing is derived from its column lengths.
     """
 
     image: np.ndarray
@@ -54,6 +59,7 @@ class MedVolume:
     keypoint_labels: np.ndarray | None = None
     bboxes: np.ndarray | None = None
     bbox_labels: np.ndarray | None = None
+    affine: np.ndarray | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.image, np.ndarray):
@@ -62,6 +68,8 @@ class MedVolume:
             raise ValueError(f"image must be 2D or 3D; got shape {self.image.shape}")
         if any(size == 0 for size in self.image.shape):
             raise ValueError("image spatial axes must be non-empty")
+        if self.image.dtype.kind not in "buif":
+            raise TypeError("image must contain real numeric intensities")
 
         if self.mask is not None:
             if not isinstance(self.mask, np.ndarray):
@@ -70,18 +78,45 @@ class MedVolume:
                 raise ValueError(
                     f"mask shape {self.mask.shape} does not match image shape {self.image.shape}"
                 )
+            if (
+                self.mask.dtype.kind not in "buif"
+                or not np.isfinite(self.mask).all()
+                or not np.equal(self.mask, np.rint(self.mask)).all()
+            ):
+                raise ValueError("mask must contain finite integer-valued labels")
 
         ndim = int(self.image.ndim)
         self.keypoints, self.keypoint_labels = self._validate_targets(
-            self.keypoints, self.keypoint_labels, "keypoint",
+            self.keypoints,
+            self.keypoint_labels,
+            "keypoint",
             lambda pts: geometry.as_keypoints(pts, ndim),
         )
         self.bboxes, self.bbox_labels = self._validate_targets(
-            self.bboxes, self.bbox_labels, "bbox",
+            self.bboxes,
+            self.bbox_labels,
+            "bbox",
             lambda bxs: geometry.as_bboxes(bxs, ndim),
         )
 
-        if self.spacing:
+        if not isinstance(self.metadata, dict):
+            raise TypeError("metadata must be a dict")
+        self.metadata = dict(self.metadata)
+        # Migrate the pre-1.0 metadata convention (native xyz to RAS).
+        if self.affine is None and self.metadata.get("affine") is not None:
+            self.affine = validate_affine(self.metadata["affine"]) @ axis_permutation(ndim)
+        if self.affine is not None:
+            self.affine = validate_affine(self.affine)
+            derived = affine_spacing(self.affine, ndim)
+            if len(self.spacing) and (
+                len(self.spacing) != ndim
+                or not np.allclose(self.spacing, derived, rtol=1e-5, atol=1e-7)
+            ):
+                raise ValueError("spacing must agree with affine column lengths")
+            self.spacing = derived
+            # Legacy metadata stays coherent; the field above is authoritative.
+            self.metadata["affine"] = self.affine @ axis_permutation(ndim)
+        if len(self.spacing):
             if len(self.spacing) != self.image.ndim:
                 raise ValueError(
                     f"spacing has {len(self.spacing)} entries but image is {self.image.ndim}D"
@@ -92,8 +127,20 @@ class MedVolume:
         else:
             self.spacing = tuple(1.0 for _ in range(self.image.ndim))
 
-        if not isinstance(self.metadata, dict):
-            raise TypeError("metadata must be a dict")
+    @property
+    def voxel_volume(self) -> float:
+        """Physical voxel volume (3D) or pixel area (2D), including shear."""
+        if self.affine is None:
+            return float(np.prod(self.spacing))
+        basis = self.affine[:3, : self.ndim]
+        return float(np.sqrt(np.linalg.det(basis.T @ basis)))
+
+    def index_to_world(self, points: object) -> np.ndarray:
+        """Convert array-index points to RAS millimetres; unknown grids raise."""
+        if self.affine is None:
+            raise ValueError("Patient geometry is unknown; supply an affine")
+        pts = geometry.as_keypoints(points, self.ndim)
+        return pts @ self.affine[:3, : self.ndim].T + self.affine[:3, 3]
 
     @staticmethod
     def _validate_targets(
@@ -164,6 +211,7 @@ class MedVolume:
         bbox_labels: np.ndarray | None = None,
         spacing: tuple[float, ...] | None = None,
         metadata: dict[str, Any] | None = None,
+        affine: np.ndarray | None = None,
     ) -> MedVolume:
         """Return a new MedVolume with selected fields swapped out.
 
@@ -177,13 +225,12 @@ class MedVolume:
             image=self.image if image is None else image,
             mask=self.mask if mask is None else mask,
             keypoints=self.keypoints if keypoints is None else keypoints,
-            keypoint_labels=(
-                self.keypoint_labels if keypoint_labels is None else keypoint_labels
-            ),
+            keypoint_labels=(self.keypoint_labels if keypoint_labels is None else keypoint_labels),
             bboxes=self.bboxes if bboxes is None else bboxes,
             bbox_labels=self.bbox_labels if bbox_labels is None else bbox_labels,
             spacing=self.spacing if spacing is None else tuple(float(s) for s in spacing),
             metadata=dict(self.metadata if metadata is None else metadata),
+            affine=self.affine if affine is None else affine,
         )
 
     def warp(
@@ -193,6 +240,7 @@ class MedVolume:
         image: np.ndarray,
         mask: np.ndarray | None = None,
         spacing: tuple[float, ...] | None = None,
+        grid_map: np.ndarray | None = None,
     ) -> MedVolume:
         """Return a new volume with a warped image and geometrically mapped targets.
 
@@ -209,15 +257,17 @@ class MedVolume:
             mask: The already-transformed mask, if any.
             spacing: New voxel spacing (only :class:`~medaugmentx.transforms.Resize`
                 needs this); ``None`` keeps the current spacing.
+            grid_map: Optional 4x4 output-to-input grid map. Changes the
+                sampling grid's affine; anatomy augmentations leave this unset.
         """
         kp = None if self.keypoints is None else geometry.map_keypoints(self.keypoints, point_map)
-        bb = (
-            None
-            if self.bboxes is None
-            else geometry.map_bboxes(self.bboxes, self.ndim, point_map)
-        )
+        bb = None if self.bboxes is None else geometry.map_bboxes(self.bboxes, self.ndim, point_map)
+        affine = self.affine
+        if grid_map is not None and affine is not None:
+            affine = affine @ validate_affine(grid_map)
+            spacing = affine_spacing(affine, self.ndim)
         return self.replace(
-            image=image, mask=mask, spacing=spacing, keypoints=kp, bboxes=bb
+            image=image, mask=mask, spacing=spacing, keypoints=kp, bboxes=bb, affine=affine
         )
 
     def remove_out_of_bounds_targets(self, min_visibility: float = 0.0) -> MedVolume:
@@ -246,9 +296,7 @@ class MedVolume:
         shape = np.asarray(self.shape, dtype=np.float64)
         new_kp, new_kp_labels = self.keypoints, self.keypoint_labels
         if self.keypoints is not None:
-            inside = np.all(
-                (self.keypoints >= 0) & (self.keypoints < shape), axis=1
-            )
+            inside = np.all((self.keypoints >= 0) & (self.keypoints < shape), axis=1)
             new_kp = self.keypoints[inside]
             if self.keypoint_labels is not None:
                 new_kp_labels = self.keypoint_labels[inside]
@@ -287,17 +335,18 @@ class MedVolume:
             image=self.image.copy(),
             mask=None if self.mask is None else self.mask.copy(),
             keypoints=None if self.keypoints is None else self.keypoints.copy(),
-            keypoint_labels=(
-                None if self.keypoint_labels is None else self.keypoint_labels.copy()
-            ),
+            keypoint_labels=(None if self.keypoint_labels is None else self.keypoint_labels.copy()),
             bboxes=None if self.bboxes is None else self.bboxes.copy(),
             bbox_labels=None if self.bbox_labels is None else self.bbox_labels.copy(),
             spacing=tuple(self.spacing),
             metadata=deepcopy(self.metadata),
+            affine=None if self.affine is None else self.affine.copy(),
         )
 
     def __repr__(self) -> str:
-        mask_repr = "None" if self.mask is None else f"shape={self.mask.shape}, dtype={self.mask.dtype}"
+        mask_repr = (
+            "None" if self.mask is None else f"shape={self.mask.shape}, dtype={self.mask.dtype}"
+        )
         targets = ""
         if self.keypoints is not None:
             targets += f", keypoints={self.num_keypoints}"

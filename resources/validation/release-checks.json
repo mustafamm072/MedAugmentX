@@ -1,0 +1,83 @@
+{
+  "version": "1.0.0",
+  "base_commit": "002e3be3ecd34ef4633613101bf8c6b8783df602",
+  "date": "2026-10-25",
+  "status": "local release candidate; no tag/publication",
+  "environment": {
+    "numpy": "2.4.4",
+    "scipy": "1.17.1",
+    "nibabel": "5.4.2",
+    "pydicom": "3.0.2",
+    "pytest": "9.0.3",
+    "ruff": "0.15.12",
+    "mypy": "2.1.0",
+    "sphinx": "8.2.3",
+    "matplotlib": "3.11.1"
+  },
+  "python": "3.11.14 (main, Oct  9 2025, 16:16:55) [Clang 17.0.0 (clang-1700.6.3.2)]",
+  "platform": "macOS-27.0.1-arm64-arm-64bit",
+  "checks": {
+    "core_suite": {
+      "passed": 719,
+      "skipped": 1,
+      "skip_reason": "optional real-framework module absent in core environment",
+      "branch_coverage_percent": 87.0907583920431,
+      "command": "python -m pytest --cov=medaugmentx --cov-branch --cov-fail-under=85"
+    },
+    "minimum_core": {
+      "passed": 718,
+      "skipped": 2,
+      "python": "3.10.20",
+      "numpy": "1.22.4",
+      "scipy": "1.9.3",
+      "nibabel": "4.0.2",
+      "pydicom": "2.3.1",
+      "scope": "Final source suite on minimum dependency environment; optional framework/plotting tests skipped"
+    },
+    "real_frameworks": {
+      "passed": 19,
+      "torch": "2.14.1",
+      "monai": "1.6.1",
+      "torchio": "1.2.1",
+      "scope": "includes spawned two-worker sample-assignment comparison"
+    },
+    "notebooks": {
+      "passed": 3
+    },
+    "standalone_examples": {
+      "passed": 8
+    },
+    "preview_replay_example": "passed, PNG inspected, JSON replay verified",
+    "cli_image_mask_round_trips": [
+      "MRI preset",
+      "CT preset"
+    ],
+    "ruff_lint": "passed",
+    "ruff_format": "passed",
+    "mypy": "passed",
+    "documentation": "Sphinx offline strict -W build passed",
+    "distributions": "wheel/sdist build and twine check passed",
+    "installed_wheel": {
+      "passed": 610,
+      "skipped": 4,
+      "python": "3.10.20",
+      "scope": "outside checkout with minimum dependencies; optional torch/viz and source-only docs checks skipped"
+    },
+    "elastic_boundary_regressions": {
+      "passed": 5,
+      "scope": "2D/3D constant/grid-constant fill and direct conservative box bounds; all five failed before the fix"
+    }
+  },
+  "unverified": [
+    "GitHub Linux/Windows/Python matrix execution on pushed commit",
+    "minimum framework versions on CI",
+    "patient/cohort model benefit",
+    "vendor-specific real DICOM exports",
+    "PyPI trusted-publisher configuration"
+  ],
+  "resources": {
+    "benchmark-patch-3d.json": "52a45ce03a3ac0fc994277b991a00d7848a8a800a8dc07db7910967991c21378",
+    "benchmark-small-3d.json": "c76cd5dc624312a85182bcd9d8fd19948bb2838c1d0e4e6d2ed417ca6538093d",
+    "synthetic-segmentation.json": "8b7dcca5d48a084a4bb4861871195d6029b2a4f065fd734402c576ef3a59b9a8"
+  }
+}

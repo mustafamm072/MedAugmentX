@@ -1,4 +1,5 @@
 """Helpers for inspecting transforms and nested augmentation pipelines."""
+
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
@@ -46,9 +47,7 @@ def iter_pipeline(transform: Transform) -> Iterator[PipelineStep]:
         ValueError: If ``transform.to_dict()`` does not expose a transform name.
     """
     if not isinstance(transform, Transform):
-        raise TypeError(
-            f"iter_pipeline expects a Transform, got {type(transform).__name__}"
-        )
+        raise TypeError(f"iter_pipeline expects a Transform, got {type(transform).__name__}")
     yield from _walk_dict(transform.to_dict(), ())
 
 

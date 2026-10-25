@@ -1,4 +1,5 @@
 """Anatomy-aware random cropping."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -8,6 +9,8 @@ import numpy as np
 
 from medaugmentx.core import geometry
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
+from medaugmentx.core.physical import grid_translation
 from medaugmentx.core.utils import SeedLike
 from medaugmentx.core.volume import MedVolume
 
@@ -43,6 +46,9 @@ class AnatomicCrop(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
+        validate_parameters(
+            size=size, foreground_prob=foreground_prob, foreground_threshold=foreground_threshold
+        )
         self.size: tuple[int, ...] = tuple(int(s) for s in size)
         if not 0.0 <= float(foreground_prob) <= 1.0:
             raise ValueError(f"foreground_prob must be in [0, 1], got {foreground_prob}")
@@ -103,7 +109,9 @@ class AnatomicCrop(Transform):
         # outside the new window keep faithful (possibly negative) coordinates;
         # call MedVolume.remove_out_of_bounds_targets() to prune them.
         point_map = geometry.translate_map(-np.asarray(origin, dtype=np.float64))
-        return volume.warp(point_map, image=new_image, mask=new_mask)
+        return volume.warp(
+            point_map, image=new_image, mask=new_mask, grid_map=grid_translation(origin)
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {

@@ -67,3 +67,18 @@ mask-destroying transform ended up in a segmentation pipeline.
 
 .. automodule:: medaugmentx.inspection
    :members:
+
+Per-sample seeding and exact replay
+-----------------------------------
+
+.. automodule:: medaugmentx.reproducibility
+   :members: seed_for_sample, apply_for_sample, record_augmentation, replay_augmentation
+
+Preview and model cards
+-----------------------
+
+.. automodule:: medaugmentx.qa
+   :members: preview_augmentation, volume_summary
+
+.. automodule:: medaugmentx.cards
+   :members: model_card, list_model_cards

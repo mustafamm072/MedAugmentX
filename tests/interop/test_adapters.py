@@ -36,10 +36,7 @@ class FakeLabelMap(FakeScalarImage):
 class FakeSubject(dict):
     def copy(self):
         return FakeSubject(
-            {
-                key: value.copy() if hasattr(value, "copy") else value
-                for key, value in self.items()
-            }
+            {key: value.copy() if hasattr(value, "copy") else value for key, value in self.items()}
         )
 
 
@@ -106,8 +103,9 @@ def test_monai_map_transform_uses_label_key_by_default():
 
     out = adapter({"image": image, "label": label})
 
-    np.testing.assert_array_equal(out["image"], np.flip(image, axis=1))
-    np.testing.assert_array_equal(out["label"], np.flip(label, axis=1))
+    # MONAI native XY order: an x flip reverses its first spatial axis.
+    np.testing.assert_array_equal(out["image"], np.flip(image, axis=0))
+    np.testing.assert_array_equal(out["label"], np.flip(label, axis=0))
 
 
 def test_channel_dim_must_be_singleton():
@@ -210,8 +208,12 @@ def test_mapping_returns_updated_spacing_and_metadata():
             return volume.replace(metadata={"processed": True})
 
     from medaugmentx import Compose
-    sample = {"image": np.ones((6, 6), dtype=np.float32),
-              "spacing": (2.0, 3.0), "metadata": {"processed": False}}
+
+    sample = {
+        "image": np.ones((6, 6), dtype=np.float32),
+        "spacing": (2.0, 3.0),
+        "metadata": {"processed": False},
+    }
     out = SampleTransform(Compose([Resize((3, 3)), UpdateMetadata()]))(sample)
     assert out["spacing"] == (4.0, 6.0)
     assert out["metadata"] == {"processed": True}

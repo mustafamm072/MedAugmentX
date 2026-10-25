@@ -1,4 +1,5 @@
 """Additive brightness shift and multiplicative contrast adjustment."""
+
 from __future__ import annotations
 
 from typing import Any, Union
@@ -6,6 +7,7 @@ from typing import Any, Union
 import numpy as np
 
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
 
@@ -14,7 +16,7 @@ Range = Union[float, tuple[float, float]]
 
 def _as_symmetric_range(x: Range, name: str) -> tuple[float, float]:
     """Scalar → ``(-v, +v)``; tuple → validated ``(lo, hi)``."""
-    if isinstance(x, (int, float)):
+    if isinstance(x, (int, float, np.integer, np.floating)):
         v = float(x)
         return (-v, v)
     lo, hi = float(x[0]), float(x[1])
@@ -55,9 +57,10 @@ class BrightnessContrast(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
+        validate_parameters(brightness=brightness, contrast=contrast, clip=clip)
         self.brightness_range = _as_symmetric_range(brightness, "brightness")
 
-        if isinstance(contrast, (int, float)):
+        if isinstance(contrast, (int, float, np.integer, np.floating)):
             v = float(contrast)
             if v <= 0:
                 raise ValueError(f"contrast scalar must be > 0, got {v}")

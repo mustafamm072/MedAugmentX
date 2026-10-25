@@ -4,6 +4,7 @@ Run with:
 
     python examples/quickstart.py
 """
+
 from __future__ import annotations
 
 import json
@@ -31,17 +32,23 @@ def main() -> None:
 
     vol = MedVolume(image=image, mask=mask, spacing=(1.0, 0.7, 0.7), metadata={"modality": "MR"})
 
-    pipeline = Compose([
-        RandomFlip(axes=("x",), p_per_axis=0.5),
-        RandomAffine(rotation=10.0, scale=(0.9, 1.1), translation=(-0.05, 0.05), p=0.7),
-        ElasticDeform(alpha=30.0, sigma=4.0, p=0.5),
-        BiasField(alpha=0.3, p=0.7),
-        OneOf([
-            RicianNoise(std=(0.005, 0.02)),
-            GaussianNoise(std=0.015),
-        ], p=0.6),
-        GammaCorrection(gamma=(0.85, 1.15), p=0.5),
-    ], seed=42)
+    pipeline = Compose(
+        [
+            RandomFlip(axes=("x",), p_per_axis=0.5),
+            RandomAffine(rotation=10.0, scale=(0.9, 1.1), translation=(-0.05, 0.05), p=0.7),
+            ElasticDeform(alpha=30.0, sigma=4.0, p=0.5),
+            BiasField(alpha=0.3, p=0.7),
+            OneOf(
+                [
+                    RicianNoise(std=(0.005, 0.02)),
+                    GaussianNoise(std=0.015),
+                ],
+                p=0.6,
+            ),
+            GammaCorrection(gamma=(0.85, 1.15), p=0.5),
+        ],
+        seed=42,
+    )
 
     out = pipeline(vol)
 

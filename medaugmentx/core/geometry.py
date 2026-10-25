@@ -29,6 +29,7 @@ its pixel mapping as a *point map* — a callable taking an ``(K, ndim)`` array 
 coordinates and returning the transformed ``(K, ndim)`` array — and this module
 threads that map through both keypoints and (via their corners) bounding boxes.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -130,9 +131,7 @@ def flip_map(flip_axes: tuple[int, ...], shape: tuple[int, ...]) -> PointMap:
     return _fn
 
 
-def affine_map(
-    forward: np.ndarray, centre: np.ndarray, translation_px: np.ndarray
-) -> PointMap:
+def affine_map(forward: np.ndarray, centre: np.ndarray, translation_px: np.ndarray) -> PointMap:
     """Point map for a forward affine warp about ``centre`` plus a translation.
 
     ``forward`` is the *forward* linear map (rotation @ scale); the image warp
@@ -165,9 +164,7 @@ def scale_map(factors: np.ndarray) -> PointMap:
     return _fn
 
 
-def displacement_map(
-    displacements: list[np.ndarray], mode: str = "reflect"
-) -> PointMap:
+def displacement_map(displacements: list[np.ndarray], mode: str = "reflect") -> PointMap:
     """Point map for an elastic displacement field.
 
     ``displacements[ax]`` is the per-axis field ``d`` such that the image warp
@@ -188,10 +185,12 @@ def displacement_map(
             return pts.copy()
         out = pts.copy()
         for _ in range(100):
-            sampled = np.column_stack([
-                map_coordinates(field, out.T, order=1, mode=mode, output=np.float64)
-                for field in displacements
-            ])
+            sampled = np.column_stack(
+                [
+                    map_coordinates(field, out.T, order=1, mode=mode, output=np.float64)
+                    for field in displacements
+                ]
+            )
             residual = out + sampled - pts
             if np.isfinite(residual).all() and np.max(np.abs(residual)) <= 1e-5:
                 return out
@@ -216,3 +215,31 @@ __all__ = [
     "scale_map",
     "displacement_map",
 ]
+
+
+def displacement_jacobian(displacements: list[np.ndarray]) -> np.ndarray:
+    """Determinant of the pull-map Jacobian I + grad(d) on the voxel grid.
+
+    Singleton axes have zero derivatives. Positive values exclude sampled local
+    folds; this discrete check does not prove global anatomical plausibility.
+    """
+    ndim = len(displacements)
+    shape = displacements[0].shape
+    matrix = np.zeros((*shape, ndim, ndim), dtype=np.float32)
+    for component, field in enumerate(displacements):
+        for axis in range(ndim):
+            derivative = np.gradient(field, axis=axis) if shape[axis] > 1 else np.zeros_like(field)
+            matrix[..., component, axis] = derivative + float(component == axis)
+    return np.linalg.det(matrix)
+
+
+def limit_displacement_gradient(fields: list[np.ndarray], maximum: float) -> list[np.ndarray]:
+    """Scale a field so its sampled Jacobian perturbation Frobenius norm is bounded."""
+    squared = np.zeros(fields[0].shape, dtype=np.float32)
+    for field in fields:
+        for axis, size in enumerate(field.shape):
+            if size > 1:
+                squared += np.gradient(field, axis=axis) ** 2
+    largest = float(np.sqrt(squared.max()))
+    factor = min(1.0, maximum / max(largest, 1e-12))
+    return [field * factor for field in fields]

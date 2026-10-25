@@ -14,14 +14,14 @@ without copying them; ``include_patterns`` keeps everything else out.
 """
 import os
 import sys
-from importlib.metadata import version as package_version
+from medaugmentx._version import __version__
 
 # Local extensions live beside this file, not on the default path.
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "_ext")))
 
 project = "MedAugmentX"
 author = "MedAugmentX Contributors"
-release = package_version("medaugmentx")
+release = __version__
 version = release
 
 extensions = [
@@ -89,6 +89,9 @@ intersphinx_mapping = {
     "numpy": ("https://numpy.org/doc/stable", None),
     "scipy": ("https://docs.scipy.org/doc/scipy", None),
 }
+if os.environ.get("MEDAUGMENTX_DOCS_OFFLINE") == "1":
+    intersphinx_mapping = {}
+
 # Intersphinx fetches these inventories over the network. With -W an
 # unreachable inventory is a build failure, so strict builds need access to
 # these hosts (or a deliberately configured local inventory/offline mapping).

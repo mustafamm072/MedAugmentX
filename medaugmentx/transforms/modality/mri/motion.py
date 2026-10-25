@@ -1,4 +1,5 @@
 """MRI in-plane rigid motion artifact."""
+
 from __future__ import annotations
 
 from typing import Any, Union
@@ -7,6 +8,7 @@ import numpy as np
 from scipy.ndimage import rotate, shift
 
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
 
@@ -48,9 +50,10 @@ class MRIMotion(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
+        validate_parameters(degrees=degrees, translation=translation, num_movements=num_movements)
         self.degrees_range = _signed_range(degrees, "degrees")
         self.translation_range = _signed_range(translation, "translation")
-        if isinstance(num_movements, int):
+        if isinstance(num_movements, (int, np.integer)):
             lo = hi = int(num_movements)
         else:
             lo, hi = int(num_movements[0]), int(num_movements[1])
@@ -61,9 +64,7 @@ class MRIMotion(Transform):
     def _move(self, image: np.ndarray, angle: float, dy: float, dx: float) -> np.ndarray:
         # In-plane axes are the last two for both 2-D and 3-D arrays.
         axes = (image.ndim - 2, image.ndim - 1)
-        rotated = rotate(
-            image, angle, axes=axes, reshape=False, order=1, mode="reflect"
-        )
+        rotated = rotate(image, angle, axes=axes, reshape=False, order=1, mode="reflect")
         sh = [0.0] * image.ndim
         sh[-2] = dy
         sh[-1] = dx
@@ -97,7 +98,7 @@ class MRIMotion(Transform):
 
 
 def _signed_range(x: Range, name: str) -> tuple[float, float]:
-    if isinstance(x, (int, float)):
+    if isinstance(x, (int, float, np.integer, np.floating)):
         v = float(x)
         if v < 0:
             raise ValueError(f"{name} scalar must be >= 0, got {v}")

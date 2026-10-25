@@ -3,6 +3,7 @@
 These exercise the regression contract from MILESTONES — fixed seeds produce
 identical outputs across runs, and image/mask spatial alignment never breaks.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -34,12 +35,15 @@ def _make_synthetic_volume(seed=0):
 
 def test_full_pipeline_runs_end_to_end():
     vol = _make_synthetic_volume()
-    pipeline = Compose([
-        RandomAffine(rotation=10.0, scale=(0.95, 1.05), p=0.7),
-        ElasticDeform(alpha=(20.0, 20.0, 2.0), sigma=(4.0, 4.0, 1.0), p=0.5),
-        OneOf([RicianNoise(std=0.02), GaussianNoise(std=0.015)], p=0.6),
-        GammaCorrection(gamma=(0.85, 1.15), p=0.5),
-    ], seed=123)
+    pipeline = Compose(
+        [
+            RandomAffine(rotation=10.0, scale=(0.95, 1.05), p=0.7),
+            ElasticDeform(alpha=(20.0, 20.0, 2.0), sigma=(4.0, 4.0, 1.0), p=0.5),
+            OneOf([RicianNoise(std=0.02), GaussianNoise(std=0.015)], p=0.6),
+            GammaCorrection(gamma=(0.85, 1.15), p=0.5),
+        ],
+        seed=123,
+    )
     out = pipeline(vol)
     assert out.image.shape == vol.image.shape
     assert out.mask.shape == vol.mask.shape
@@ -50,12 +54,18 @@ def test_full_pipeline_runs_end_to_end():
 
 def test_seed_yields_bit_identical_output():
     vol = _make_synthetic_volume()
-    cfg = lambda seed: Compose([  # noqa: E731
-        RandomFlip(axes=("x",), p_per_axis=0.5),
-        RandomAffine(rotation=15.0, scale=(0.9, 1.1)),
-        ElasticDeform(alpha=8.0, sigma=2.0),
-        GammaCorrection(gamma=(0.7, 1.3)),
-    ], seed=seed)
+
+    def cfg(seed):
+        return Compose(
+            [
+                RandomFlip(axes=("x",), p_per_axis=0.5),
+                RandomAffine(rotation=15.0, scale=(0.9, 1.1)),
+                ElasticDeform(alpha=8.0, sigma=2.0),
+                GammaCorrection(gamma=(0.7, 1.3)),
+            ],
+            seed=seed,
+        )
+
     a = cfg(2025)(vol)
     b = cfg(2025)(vol)
     np.testing.assert_array_equal(a.image, b.image)
@@ -69,14 +79,17 @@ def test_dbt_pipeline_preserves_geometry():
     mask[5:15, 20:40, 20:40] = 1
     vol = MedVolume(image=img, mask=mask, spacing=(1.0, 0.1, 0.1), metadata={"modality": "DBT"})
 
-    pipeline = Compose([
-        RandomFlip(axes=("x",), p_per_axis=0.5),
-        SlabShift(max_shift=2),
-        AnisotropicElastic(alpha=(20.0, 20.0, 2.0), sigma=(4.0, 4.0, 1.0)),
-        LimitedAngleBlur(arc_degrees=(15.0, 25.0), base_sigma=1.0),
-        SliceDropout(num_slices=(0, 2)),
-        GammaCorrection(gamma=(0.85, 1.15)),
-    ], seed=1)
+    pipeline = Compose(
+        [
+            RandomFlip(axes=("x",), p_per_axis=0.5),
+            SlabShift(max_shift=2),
+            AnisotropicElastic(alpha=(20.0, 20.0, 2.0), sigma=(4.0, 4.0, 1.0)),
+            LimitedAngleBlur(arc_degrees=(15.0, 25.0), base_sigma=1.0),
+            SliceDropout(num_slices=(0, 2)),
+            GammaCorrection(gamma=(0.85, 1.15)),
+        ],
+        seed=1,
+    )
     out = pipeline(vol)
     assert out.image.shape == vol.image.shape
     assert out.mask.shape == vol.mask.shape
@@ -94,11 +107,15 @@ def test_image_mask_alignment_under_many_seeds():
     mask = (img > 0).astype(np.uint8)
     vol = MedVolume(image=img, mask=mask)
 
-    pipeline_factory = lambda seed: Compose([  # noqa: E731
-        RandomFlip(axes=("x", "y"), p_per_axis=0.5),
-        RandomAffine(rotation=20.0, scale=(0.9, 1.1), order=0),
-        ElasticDeform(alpha=4.0, sigma=2.0, order=0),
-    ], seed=seed)
+    def pipeline_factory(seed):
+        return Compose(
+            [
+                RandomFlip(axes=("x", "y"), p_per_axis=0.5),
+                RandomAffine(rotation=20.0, scale=(0.9, 1.1), order=0),
+                ElasticDeform(alpha=4.0, sigma=2.0, order=0),
+            ],
+            seed=seed,
+        )
 
     for s in range(100):
         out = pipeline_factory(s)(vol)

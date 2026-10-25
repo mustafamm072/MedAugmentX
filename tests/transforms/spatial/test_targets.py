@@ -4,6 +4,7 @@ The recurring strategy: place a single bright pixel at a keypoint, run the
 transform, and assert the keypoint still coincides with the (moved) pixel peak.
 Deterministic transforms are also checked against exact expected coordinates.
 """
+
 import numpy as np
 
 from medaugmentx.core import Compose, MedVolume
@@ -71,7 +72,9 @@ class TestAffine:
 
     def test_3d_rotation_tracks_pixel(self):
         v = _volume_with_point((16, 24, 24), (5, 6, 18))
-        out = RandomAffine(rotation=(20.0, 20.0), axes_enabled=("x", "y"), order=1, p=1.0, seed=2).apply(v)
+        out = RandomAffine(
+            rotation=(20.0, 20.0), axes_enabled=("x", "y"), order=1, p=1.0, seed=2
+        ).apply(v)
         peak = _peak(out.image)
         kp = out.keypoints[0]
         assert all(abs(p - k) <= 1.5 for p, k in zip(peak, kp))
@@ -103,8 +106,8 @@ class TestResize:
     def test_resize_scales_coords(self):
         v = _volume_with_point((10, 20), (3, 5))
         out = Resize(size=(20, 40)).apply(v)  # factor (2, 2)
-        np.testing.assert_allclose(out.keypoints[0], [3 * 19 / 9, 5 * 39 / 19])
-        np.testing.assert_allclose(out.bboxes[0], [3 * 19 / 9, 5 * 39 / 19, 4 * 19 / 9, 6 * 39 / 19])
+        np.testing.assert_allclose(out.keypoints[0], [6.5, 10.5])
+        np.testing.assert_allclose(out.bboxes[0], [6.5, 10.5, 8.5, 12.5])
 
     def test_resize_same_size_is_noop(self):
         v = _volume_with_point((8, 8), (2, 2))

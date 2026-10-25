@@ -1,4 +1,5 @@
 """MRI k-space corruption (line dropout and spike artifacts)."""
+
 from __future__ import annotations
 
 from typing import Any, Union
@@ -6,6 +7,7 @@ from typing import Any, Union
 import numpy as np
 
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
 
@@ -48,7 +50,8 @@ class KSpaceDropout(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
-        if isinstance(dropout_fraction, (int, float)):
+        validate_parameters(dropout_fraction=dropout_fraction, phase_encode_axis=phase_encode_axis)
+        if isinstance(dropout_fraction, (int, float, np.integer, np.floating)):
             v = float(dropout_fraction)
             if not 0 <= v <= 1:
                 raise ValueError("dropout_fraction must be in [0, 1]")

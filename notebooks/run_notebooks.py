@@ -10,6 +10,7 @@ Requires the notebook extra:
 
     pip install -e ".[notebooks]"
 """
+
 from __future__ import annotations
 
 import argparse
@@ -30,19 +31,23 @@ def main() -> int:
 
     # Keep the matplotlib font cache out of the checkout so a CI runner with a
     # read-only or empty HOME still works.
-    os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "medaugmentx-matplotlib"))
+    os.environ.setdefault(
+        "MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "medaugmentx-matplotlib")
+    )
 
     try:
         import nbformat
         from nbclient import NotebookClient
         from nbclient.exceptions import CellExecutionError
     except ImportError as exc:  # pragma: no cover - depends on the environment
-        print(f"Missing notebook dependencies ({exc}).\n"
-              'Install them with: pip install -e ".[notebooks]"', file=sys.stderr)
+        print(
+            f"Missing notebook dependencies ({exc}).\n"
+            'Install them with: pip install -e ".[notebooks]"',
+            file=sys.stderr,
+        )
         return 2
 
-    paths = ([HERE / name for name in args.names] if args.names
-             else sorted(HERE.glob("*.ipynb")))
+    paths = [HERE / name for name in args.names] if args.names else sorted(HERE.glob("*.ipynb"))
     missing = [p for p in paths if not p.exists()]
     if missing:
         print("No such notebook: " + ", ".join(p.name for p in missing), file=sys.stderr)

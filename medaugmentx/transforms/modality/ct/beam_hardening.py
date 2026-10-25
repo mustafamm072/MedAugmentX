@@ -1,4 +1,5 @@
 """CT beam hardening (cupping) artifact simulation."""
+
 from __future__ import annotations
 
 from typing import Any, Union
@@ -6,6 +7,7 @@ from typing import Any, Union
 import numpy as np
 
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
 
@@ -52,7 +54,8 @@ class BeamHardening(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
-        if isinstance(alpha, (int, float)):
+        validate_parameters(alpha=alpha, power=power)
+        if isinstance(alpha, (int, float, np.integer, np.floating)):
             v = float(alpha)
             if v < 0:
                 raise ValueError(f"alpha must be >= 0, got {alpha}")
@@ -74,9 +77,7 @@ class BeamHardening(Transform):
         x = np.linspace(0, w - 1, w, dtype=np.float32)
         yy, xx = np.meshgrid(y, x, indexing="ij")
         # Normalised radius: 0 at centre, 1 at corner of bounding circle
-        r = np.sqrt(
-            ((yy - cy) / max(cy, 1.0)) ** 2 + ((xx - cx) / max(cx, 1.0)) ** 2
-        )
+        r = np.sqrt(((yy - cy) / max(cy, 1.0)) ** 2 + ((xx - cx) / max(cx, 1.0)) ** 2)
         r = np.clip(r, 0.0, 1.0)
         return (1.0 - r**self.power).astype(np.float32)
 

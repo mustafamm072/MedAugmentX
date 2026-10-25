@@ -1,4 +1,5 @@
 """Shared fixtures for the MedAugment test suite."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -23,9 +24,7 @@ def vol2d(rng):
 def vol3d(rng):
     image = rng.random((16, 32, 32), dtype=np.float64).astype(np.float32)
     mask = (image > 0.7).astype(np.uint8)
-    return MedVolume(
-        image=image, mask=mask, spacing=(2.5, 0.7, 0.7), metadata={"modality": "MR"}
-    )
+    return MedVolume(image=image, mask=mask, spacing=(2.5, 0.7, 0.7), metadata={"modality": "MR"})
 
 
 @pytest.fixture

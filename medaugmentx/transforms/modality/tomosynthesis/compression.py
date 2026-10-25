@@ -1,4 +1,5 @@
 """CompressionVariation — DBT paddle-compression variation."""
+
 from __future__ import annotations
 
 from typing import Any, Union
@@ -8,6 +9,7 @@ from scipy.ndimage import affine_transform
 
 from medaugmentx.core import geometry
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.utils import SeedLike, as_float32, axis_label_to_index
 from medaugmentx.core.volume import MedVolume
 
@@ -48,7 +50,8 @@ class CompressionVariation(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
-        if isinstance(scale, (int, float)):
+        validate_parameters(scale=scale, axis=axis, order=order)
+        if isinstance(scale, (int, float, np.integer, np.floating)):
             v = float(scale)
             if v <= 0:
                 raise ValueError("scale must be > 0")
@@ -103,7 +106,8 @@ class CompressionVariation(Transform):
         centre = (np.asarray(volume.shape, dtype=np.float64) - 1.0) / 2.0
         return volume.warp(
             geometry.affine_map(forward, centre, np.zeros(volume.ndim)),
-            image=new_image.astype(np.float32, copy=False), mask=new_mask,
+            image=new_image.astype(np.float32, copy=False),
+            mask=new_mask,
         )
 
     def to_dict(self) -> dict[str, Any]:

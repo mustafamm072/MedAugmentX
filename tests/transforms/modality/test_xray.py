@@ -20,6 +20,7 @@ def vol3d():
 
 # ---- ScatterSimulation ----
 
+
 def test_scatter_shape_dtype(vol2d):
     out = ScatterSimulation(sigma=(5.0, 10.0), seed=0)(vol2d)
     assert out.image.shape == vol2d.image.shape
@@ -63,6 +64,7 @@ def test_scatter_to_dict_round_trip():
 
 
 # ---- GridArtifact ----
+
 
 def test_grid_shape_dtype_3d(vol3d):
     out = GridArtifact(seed=0)(vol3d)

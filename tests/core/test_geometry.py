@@ -1,4 +1,5 @@
 """Tests for keypoint/bbox targets on MedVolume and the geometry helpers."""
+
 import numpy as np
 import pytest
 
@@ -118,7 +119,9 @@ class TestReplaceCopy:
 class TestWarp:
     def test_warp_no_targets_is_replace(self):
         v = MedVolume(image=np.zeros((4, 4), dtype=np.float32))
-        out = v.warp(geometry.translate_map(np.array([1.0, 1.0])), image=np.ones((4, 4), np.float32))
+        out = v.warp(
+            geometry.translate_map(np.array([1.0, 1.0])), image=np.ones((4, 4), np.float32)
+        )
         assert out.keypoints is None
         assert np.all(out.image == 1.0)
 

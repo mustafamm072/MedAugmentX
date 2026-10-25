@@ -35,14 +35,18 @@ in your controlled experiment store rather than publishing them with examples.
 
 ## Multiple workers and epochs
 
-Create independent pipelines inside each data-loader worker. Copying a pipeline
-into workers can duplicate random streams. Derive a seed from stable integer
-identifiers using `numpy.random.SeedSequence([experiment_seed, epoch, worker_id])`,
-then pass an integer from `generate_state(1)` to your preset. Record worker
-count and sample order: changing either can change which draw reaches a sample.
-For scheduling-independent augmentation, construct a pipeline per sample using
-an additional stable sample index and omit the worker id from its seed. Avoid
-Python's process-dependent `hash()` for seed derivation.
+Use `apply_for_sample(policy, volume, seed=experiment_seed, sample_id=stable_id,
+epoch=epoch)` in Dataset.__getitem__. Its seed is independent of worker count,
+rank and processing order. Use `augmentation_index` for independent replicas.
+Update epoch explicitly in worker-local state, especially with persistent
+workers. Do not use Python's process-dependent `hash()` for seed derivation.
+Worker assignment independence is tested with actual spawned PyTorch workers.
+
+For an exact draw, `output, record = record_augmentation(policy, volume)` captures
+RNG state and branch decisions; `replay_augmentation(record, volume)` verifies
+input/environment/output hashes. Configuration serialization alone restarts
+streams. Records require identical software versions and do not promise bitwise
+portability. See [migration](MIGRATION_V1.md) and the preview/replay example.
 
 ## Report a useful comparison
 
@@ -55,8 +59,9 @@ alongside the task metric. Keep preprocessing and model settings matched.
 Use `VolumeValidator` and visual inspection to catch unusable outputs. Document
 how often guards reject or revert samples in your own experiment loop; a
 passing validation report only covers configured structural/statistical rules.
-For non-linear deformations, bounding boxes use transformed corners and are
-an approximation, not a guaranteed enclosure of all warped anatomy.
+Elastic boxes default to conservative global displacement bounds; the optional
+corner-only mode is an approximation. See [measured synthetic ablation](../benchmarks/README.md),
+which includes a negative augmentation result.
 
 ## Citation and contributions
 

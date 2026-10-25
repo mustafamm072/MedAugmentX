@@ -1,4 +1,4 @@
-"""Lightweight adapters for PyTorch, torchvision, MONAI, and TorchIO samples."""
+"""Import-lazy adapters with explicit spatial layout and patient-space geometry."""
 
 from __future__ import annotations
 
@@ -10,135 +10,120 @@ from typing import Any, Literal, Union
 import numpy as np
 
 from medaugmentx.core import MedVolume, Transform
+from medaugmentx.core.physical import axis_permutation
 
 ChannelDim = Union[int, Literal["auto", "first", "last"], None]
 
 
 @dataclass(frozen=True)
 class _ArraySpec:
-    """How to restore an augmented NumPy array to the caller's input type."""
-
     template: Any
-    kind: Literal["numpy", "torch"]
+    kind: str
     channel_axis: int | None
     preserve_dtype: bool
+    reverse: bool = False
 
 
 def _is_torch_tensor(value: Any) -> bool:
-    """Return True for torch tensors without importing torch at module import."""
-    cls = type(value)
-    return (
-        cls.__module__.startswith("torch")
-        and hasattr(value, "detach")
-        and hasattr(value, "cpu")
-        and hasattr(value, "numpy")
+    return any(
+        cls.__module__.startswith("torch") and cls.__name__ in ("Tensor", "TensorBase")
+        for cls in type(value).__mro__
     )
 
 
-def _as_numpy(value: Any) -> tuple[np.ndarray, Literal["numpy", "torch"]]:
+def _as_numpy(value: Any) -> tuple[np.ndarray, str]:
     if isinstance(value, np.ndarray):
         return value, "numpy"
     if _is_torch_tensor(value):
-        return value.detach().cpu().numpy(), "torch"
+        tensor = value.detach().cpu()
+        if str(tensor.dtype) == "torch.bfloat16":
+            tensor = tensor.float()
+        return tensor.numpy(), "torch"
     raise TypeError(
-        "Expected a numpy.ndarray, torch.Tensor, MedVolume, tuple, or mapping sample; "
-        f"got {type(value).__name__}"
+        f"Expected a numpy.ndarray, torch.Tensor or supported sample; got {type(value).__name__}"
     )
 
 
-def _normalise_channel_axis(channel_dim: ChannelDim, ndim: int) -> int | Literal["auto"] | None:
-    if channel_dim is None:
-        return None
-    if channel_dim == "auto":
-        return "auto"
+def _normalise_channel_axis(channel_dim: ChannelDim, ndim: int) -> int | str | None:
+    if channel_dim in (None, "auto"):
+        return channel_dim
     if channel_dim == "first":
         return 0
     if channel_dim == "last":
         return ndim - 1
-    axis = int(channel_dim)
-    if axis < 0:
-        axis += ndim
+    if not isinstance(channel_dim, int):
+        raise ValueError("channel_dim must be None, auto, first, last, or an integer")
+    axis = channel_dim + ndim if channel_dim < 0 else channel_dim
     if not 0 <= axis < ndim:
-        raise ValueError(f"channel_dim={channel_dim!r} is out of range for ndim={ndim}")
+        raise ValueError("channel_dim is out of range")
     return axis
 
 
-def _strip_channel(array: np.ndarray, channel_dim: ChannelDim) -> tuple[np.ndarray, int | None]:
-    """Remove one singleton channel axis so MedVolume sees a 2D/3D image."""
-    axis = _normalise_channel_axis(channel_dim, array.ndim)
-    if axis is None:
-        if array.ndim in (2, 3):
-            return array, None
-        raise ValueError(
-            "MedVolume supports 2D or 3D arrays. Pass channel_dim=0, "
-            "channel_dim='last', or channel_dim='auto' for singleton-channel tensors."
-        )
-
-    if axis == "auto":
-        if array.ndim in (3, 4) and array.shape[0] == 1:
-            return np.squeeze(array, axis=0), 0
-        if array.ndim in (3, 4) and array.shape[-1] == 1:
-            return np.squeeze(array, axis=array.ndim - 1), array.ndim - 1
-        if array.ndim in (2, 3):
-            return array, None
-        raise ValueError(
-            "Could not infer a singleton channel dimension. Pass channel_dim explicitly."
-        )
-
-    if array.shape[axis] != 1:
-        raise ValueError(
-            "MedAugmentX transforms operate on single-channel 2D/3D medical images; "
-            f"channel axis {axis} has size {array.shape[axis]}."
-        )
-    return np.squeeze(array, axis=axis), axis
-
-
 def _to_volume_array(
-    value: Any,
-    *,
-    channel_dim: ChannelDim,
-    preserve_dtype: bool,
+    value: Any, *, channel_dim: ChannelDim, preserve_dtype: bool, reverse: bool = False
 ) -> tuple[np.ndarray, _ArraySpec]:
     array, kind = _as_numpy(value)
-    squeezed, channel_axis = _strip_channel(array, channel_dim)
-    return squeezed, _ArraySpec(value, kind, channel_axis, preserve_dtype)
+    axis = _normalise_channel_axis(channel_dim, array.ndim)
+    if axis == "auto":
+        axis = (
+            0
+            if array.ndim in (3, 4) and array.shape[0] == 1
+            else array.ndim - 1
+            if array.ndim in (3, 4) and array.shape[-1] == 1
+            else None
+        )
+    assert axis is None or isinstance(axis, int)
+    if axis is not None:
+        if array.shape[axis] != 1:
+            raise ValueError(
+                "MedAugmentX supports single-channel images; channel axis must be singleton"
+            )
+        array = np.squeeze(array, axis=axis)
+    if array.ndim not in (2, 3):
+        raise ValueError("Expected 2D/3D spatial data; configure a singleton channel_dim")
+    if reverse:
+        array = array.transpose()
+    return array, _ArraySpec(value, kind, axis, preserve_dtype, reverse)
 
 
-def _restore_channel(array: np.ndarray, channel_axis: int | None) -> np.ndarray:
-    if channel_axis is None:
-        return array
-    return np.expand_dims(array, axis=channel_axis)
-
-
-def _restore_array(array: np.ndarray, spec: _ArraySpec) -> Any:
-    restored = _restore_channel(array, spec.channel_axis)
+def _restore_array(array: np.ndarray, spec: _ArraySpec, affine: np.ndarray | None = None) -> Any:
+    out = array.transpose() if spec.reverse else array
+    if spec.channel_axis is not None:
+        out = np.expand_dims(out, spec.channel_axis)
     if spec.kind == "numpy":
         if spec.preserve_dtype:
-            return restored.astype(spec.template.dtype, copy=False)
-        return restored
-
+            if spec.template.dtype.kind in "iu":
+                bounds = np.iinfo(spec.template.dtype)
+                out = np.clip(out, bounds.min, bounds.max)
+            out = out.astype(spec.template.dtype, copy=False)
+        return np.ascontiguousarray(out)
     import torch
 
-    out = torch.as_tensor(restored, device=spec.template.device)
+    tensor = torch.as_tensor(np.ascontiguousarray(out), device=spec.template.device)
     if spec.preserve_dtype:
-        out = out.to(dtype=spec.template.dtype)
-    return out
+        if not spec.template.dtype.is_floating_point and spec.template.dtype != torch.bool:
+            bounds = torch.iinfo(spec.template.dtype)
+            tensor = tensor.clamp(bounds.min, bounds.max)
+        tensor = tensor.to(spec.template.dtype)
+    if hasattr(spec.template, "applied_operations") and hasattr(spec.template, "affine"):
+        from monai.data import MetaTensor
+
+        # Our transforms are not MONAI-invertible. Do not retain stale inversion
+        # history that claims an upstream grid still matches this tensor.
+        metadata = copy.deepcopy(spec.template.meta)
+        metadata.pop("affine", None)
+        metadata["medaugmentx_noninvertible"] = True
+        tensor = MetaTensor(tensor, affine=affine, meta=metadata, applied_operations=[])
+    return tensor
 
 
 class SampleTransform:
-    """Adapt a MedAugmentX transform to common dataset sample shapes.
+    """Adapt one image plus labels, targets, spacing, and affine in dataset samples.
 
-    ``SampleTransform`` accepts one of:
-
-    - a :class:`~medaugmentx.core.MedVolume`, returned as a ``MedVolume``;
-    - an image array/tensor, returned as the same array/tensor kind;
-    - ``(image, mask)``, returned as the same tuple/list kind;
-    - a mapping with image/mask keys, returned as a shallow-copied mapping.
-
-    PyTorch is optional. If a torch tensor is passed, the adapter moves it to
-    CPU for the NumPy/SciPy transform, then restores the result to the original
-    device. Masks preserve their dtype by default; image dtype follows the
-    transform output unless ``preserve_image_dtype=True`` is set.
+    Spatial order is explicit: ``array`` means DHW/HW, ``native`` means XYZ/XY.
+    Affines use the sample's spatial order and RAS millimetres. Arrays without
+    affine have unknown patient geometry. Tensor processing runs on CPU and
+    restores the input device; this is not a GPU backend.
     """
 
     def __init__(
@@ -152,131 +137,177 @@ class SampleTransform:
         channel_dim: ChannelDim = "auto",
         preserve_image_dtype: bool = False,
         preserve_mask_dtype: bool = True,
+        spatial_order: str = "array",
+        affine_key: str | None = "affine",
+        require_mask: bool = False,
     ) -> None:
         if not isinstance(transform, Transform):
-            raise TypeError(
-                f"SampleTransform expects a medaugmentx Transform; got {type(transform).__name__}"
-            )
+            raise TypeError("SampleTransform expects a medaugmentx Transform")
+        if spatial_order not in ("array", "native"):
+            raise ValueError("spatial_order must be array or native")
         self.transform = transform
-        self.image_key = image_key
-        self.mask_key = mask_key
-        self.spacing_key = spacing_key
-        self.metadata_key = metadata_key
+        self.image_key, self.mask_key = image_key, mask_key
+        self.spacing_key, self.metadata_key = spacing_key, metadata_key
         self.channel_dim = channel_dim
-        self.preserve_image_dtype = bool(preserve_image_dtype)
-        self.preserve_mask_dtype = bool(preserve_mask_dtype)
+        self.preserve_image_dtype, self.preserve_mask_dtype = (
+            preserve_image_dtype,
+            preserve_mask_dtype,
+        )
+        self.spatial_order, self.affine_key, self.require_mask = (
+            spatial_order,
+            affine_key,
+            require_mask,
+        )
 
     def __call__(self, sample: Any) -> Any:
         if isinstance(sample, MedVolume):
             return self.transform(sample)
         if isinstance(sample, Mapping):
             return self._call_mapping(sample)
-        if isinstance(sample, tuple) or isinstance(sample, list):
-            return self._call_sequence(sample)
-        image, _, _ = self._augment(image=sample, mask=None)
-        return image
+        if isinstance(sample, (tuple, list)):
+            if len(sample) != 2:
+                raise ValueError("Sequence samples must be (image, mask)")
+            image, mask, _ = self._augment(image=sample[0], mask=sample[1])
+            return [image, mask] if isinstance(sample, list) else (image, mask)
+        return self._augment(image=sample, mask=None)[0]
 
     def _augment(
         self,
         *,
         image: Any,
         mask: Any | None,
-        spacing: tuple[float, ...] | None = None,
+        spacing: Any = None,
         metadata: Mapping[str, Any] | None = None,
+        affine: Any = None,
+        targets: Mapping[str, Any] | None = None,
+        reverse: bool | None = None,
     ) -> tuple[Any, Any | None, MedVolume]:
+        if reverse is None:
+            reverse = self.spatial_order == "native"
+        for tensor in (image, mask):
+            if tensor is not None and getattr(tensor, "pending_operations", []):
+                raise ValueError("Materialize pending MONAI lazy operations before augmentation")
         image_array, image_spec = _to_volume_array(
             image,
             channel_dim=self.channel_dim,
             preserve_dtype=self.preserve_image_dtype,
+            reverse=reverse,
         )
-        mask_array = None
-        mask_spec = None
+        mask_array, mask_spec = None, None
         if mask is not None:
             mask_array, mask_spec = _to_volume_array(
                 mask,
                 channel_dim=self.channel_dim,
                 preserve_dtype=self.preserve_mask_dtype,
+                reverse=reverse,
             )
-
+        if affine is None:
+            affine = getattr(image, "affine", None)
+        if affine is not None:
+            affine = _as_numpy(affine)[0] if _is_torch_tensor(affine) else np.asarray(affine)
+            mask_affine = getattr(mask, "affine", None)
+            if mask_affine is not None and not np.allclose(_as_numpy(mask_affine)[0], affine):
+                raise ValueError("Image and label patient-space grids disagree")
+            if reverse:
+                affine = affine @ axis_permutation(image_array.ndim)
+        spacing = () if spacing is None else tuple(float(s) for s in spacing)
+        if reverse:
+            spacing = spacing[::-1]
+        target_values = {}
+        for key, value in (targets or {}).items():
+            arr = _as_numpy(value)[0] if _is_torch_tensor(value) else np.asarray(value)
+            if reverse and key in ("keypoints", "bboxes"):
+                ndim = image_array.ndim
+                arr = (
+                    arr[:, ::-1]
+                    if key == "keypoints"
+                    else np.concatenate([arr[:, :ndim][:, ::-1], arr[:, ndim:][:, ::-1]], axis=1)
+                )
+            target_values[key] = arr
         volume = MedVolume(
-            image=image_array,
-            mask=mask_array,
-            spacing=() if spacing is None else tuple(float(s) for s in spacing),
-            metadata={} if metadata is None else dict(metadata),
+            image_array,
+            mask_array,
+            spacing,
+            {} if metadata is None else dict(metadata),
+            affine=affine,
+            **target_values,
         )
         augmented = self.transform(volume)
-        out_image = _restore_array(augmented.image, image_spec)
-        out_mask = None
-        if mask_spec is not None and augmented.mask is not None:
-            out_mask = _restore_array(augmented.mask, mask_spec)
-        return out_image, out_mask, augmented
+        output_affine = augmented.affine
+        if output_affine is not None and reverse:
+            output_affine = output_affine @ axis_permutation(augmented.ndim)
+        return (
+            _restore_array(augmented.image, image_spec, output_affine),
+            None
+            if mask_spec is None or augmented.mask is None
+            else _restore_array(augmented.mask, mask_spec, output_affine),
+            augmented,
+        )
 
-    def _call_mapping(self, sample: Mapping[str, Any]) -> Mapping[str, Any]:
+    def _call_mapping(self, sample: Mapping[str, Any]) -> dict[str, Any]:
         if self.image_key not in sample:
             raise KeyError(f"image_key={self.image_key!r} not found in sample")
-        mask_key = self.mask_key
-        mask_present = mask_key is not None and mask_key in sample
-        spacing = self._get_optional_tuple(sample, self.spacing_key)
-        metadata = self._get_optional_mapping(sample, self.metadata_key)
+        if self.require_mask and self.mask_key is not None and self.mask_key not in sample:
+            raise KeyError(f"mask_key={self.mask_key!r} not found in sample")
+        metadata = sample.get(self.metadata_key) if self.metadata_key else None
+        if metadata is not None and not isinstance(metadata, Mapping):
+            raise TypeError("metadata_key must point to a mapping")
+        keys = ("keypoints", "keypoint_labels", "bboxes", "bbox_labels")
+        targets = {key: sample[key] for key in keys if key in sample and sample[key] is not None}
         image, mask, augmented = self._augment(
             image=sample[self.image_key],
-            mask=sample[mask_key] if mask_present and mask_key is not None else None,
-            spacing=spacing,
+            mask=sample.get(self.mask_key) if self.mask_key else None,
+            spacing=sample.get(self.spacing_key) if self.spacing_key else None,
             metadata=metadata,
+            affine=sample.get(self.affine_key) if self.affine_key else None,
+            targets=targets,
         )
         out = dict(sample)
         out[self.image_key] = image
-        if self.spacing_key is not None and self.spacing_key in sample:
-            out[self.spacing_key] = augmented.spacing
-        if self.metadata_key is not None and self.metadata_key in sample:
+        if self.mask_key is not None and self.mask_key in sample:
+            out[self.mask_key] = mask
+        reverse = self.spatial_order == "native"
+        if self.spacing_key and self.spacing_key in sample:
+            out[self.spacing_key] = augmented.spacing[::-1] if reverse else augmented.spacing
+        if self.metadata_key and self.metadata_key in sample:
             out[self.metadata_key] = augmented.metadata
-        if mask_present and mask_key is not None:
-            out[mask_key] = mask
+        if self.affine_key and augmented.affine is not None:
+            out[self.affine_key] = (
+                augmented.affine @ axis_permutation(augmented.ndim)
+                if reverse
+                else augmented.affine.copy()
+            )
+        for key in targets:
+            value = getattr(augmented, key)
+            if reverse and key in ("keypoints", "bboxes"):
+                n = augmented.ndim
+                value = (
+                    value[:, ::-1]
+                    if key == "keypoints"
+                    else np.concatenate([value[:, :n][:, ::-1], value[:, n:][:, ::-1]], axis=1)
+                )
+            if _is_torch_tensor(sample[key]):
+                import torch
+
+                value = torch.as_tensor(value.copy(), device=sample[key].device)
+            out[key] = value
         return out
 
-    def _call_sequence(self, sample: tuple[Any, ...] | list[Any]) -> tuple[Any, Any] | list[Any]:
-        if len(sample) != 2:
-            raise ValueError("Sequence samples must be (image, mask)")
-        image, mask, _ = self._augment(image=sample[0], mask=sample[1])
-        if isinstance(sample, list):
-            return [image, mask]
-        return image, mask
-
-    @staticmethod
-    def _get_optional_tuple(
-        sample: Mapping[str, Any],
-        key: str | None,
-    ) -> tuple[float, ...] | None:
-        if key is None or key not in sample or sample[key] is None:
-            return None
-        return tuple(float(s) for s in sample[key])
-
-    @staticmethod
-    def _get_optional_mapping(
-        sample: Mapping[str, Any],
-        key: str | None,
-    ) -> Mapping[str, Any] | None:
-        if key is None or key not in sample or sample[key] is None:
-            return None
-        value = sample[key]
-        if not isinstance(value, Mapping):
-            raise TypeError(f"metadata_key={key!r} must point to a mapping")
-        return value
-
     def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}(transform={self.transform!r}, "
-            f"image_key={self.image_key!r}, mask_key={self.mask_key!r}, "
-            f"channel_dim={self.channel_dim!r})"
-        )
+        return f"{type(self).__name__}(transform={self.transform!r}, spatial_order={self.spatial_order!r})"
 
 
 class TorchTransform(SampleTransform):
-    """PyTorch/torchvision-compatible callable wrapper for MedAugmentX transforms."""
+    """PyTorch dataset adapter using DHW/HW array order by default."""
 
 
 class MonaiMapTransform(SampleTransform):
-    """MONAI-style dictionary wrapper using ``image`` and ``label`` keys by default."""
+    """MONAI adapter using native spatial order and retaining current MetaTensor affine.
+
+    Inversion history is explicitly cleared; MedAugmentX is not MONAI-invertible.
+    Pass label_key=None for image-only samples, or spatial_order='array' for a
+    custom MONAI pipeline that has already converted its spatial axes to DHW.
+    """
 
     def __init__(
         self,
@@ -289,6 +320,8 @@ class MonaiMapTransform(SampleTransform):
         channel_dim: ChannelDim = "auto",
         preserve_image_dtype: bool = False,
         preserve_label_dtype: bool = True,
+        spatial_order: str = "native",
+        affine_key: str | None = "affine",
     ) -> None:
         super().__init__(
             transform,
@@ -299,107 +332,30 @@ class MonaiMapTransform(SampleTransform):
             channel_dim=channel_dim,
             preserve_image_dtype=preserve_image_dtype,
             preserve_mask_dtype=preserve_label_dtype,
+            spatial_order=spatial_order,
+            affine_key=affine_key,
+            require_mask=label_key is not None,
         )
 
 
 def _looks_like_torchio_image(value: Any) -> bool:
-    return hasattr(value, "data") and (
-        hasattr(value, "set_data") or type(value).__module__.startswith("torchio")
-    )
-
-
-def _looks_like_torchio_subject(value: Any) -> bool:
-    if _looks_like_torchio_image(value):
-        return False
-    if not hasattr(value, "keys"):
-        return False
-    for key in _subject_keys(value):
-        try:
-            if _looks_like_torchio_image(_subject_get(value, key)):
-                return True
-        except (KeyError, TypeError):
-            continue
-    return False
-
-
-def _is_torchio_label(value: Any, key: str | None = None) -> bool:
-    name = type(value).__name__.lower()
-    key_text = "" if key is None else key.lower()
-    return "label" in name or "label" in key_text or "mask" in key_text or "seg" in key_text
-
-
-def _subject_keys(subject: Any) -> list[str]:
-    if hasattr(subject, "keys"):
-        return [str(k) for k in subject.keys()]
-    raise TypeError(
-        "TorchIOTransform expects a TorchIO Subject-like mapping or an Image-like object "
-        "with a .data attribute"
-    )
-
-
-def _subject_contains(subject: Any, key: str) -> bool:
-    try:
-        return key in subject
-    except TypeError:
-        return False
-
-
-def _subject_get(subject: Any, key: str) -> Any:
-    try:
-        return subject[key]
-    except KeyError:
-        raise
-    except TypeError as exc:
-        raise TypeError("TorchIO Subject-like objects must support item access") from exc
-
-
-def _subject_set(subject: Any, key: str, value: Any) -> None:
-    try:
-        subject[key] = value
-    except TypeError as exc:
-        raise TypeError("TorchIO Subject-like objects must support item assignment") from exc
-
-
-def _copy_if_possible(value: Any) -> Any:
-    try:
-        return copy.copy(value)
-    except Exception:
-        copy_method = getattr(value, "copy", None)
-        if callable(copy_method):
-            return copy_method()
-    return value
-
-
-def _set_torchio_data(image: Any, data: Any) -> None:
-    set_data = getattr(image, "set_data", None)
-    if callable(set_data):
-        set_data(data)
-        return
-    try:
-        image.data = data
-    except AttributeError as exc:
-        raise TypeError("TorchIO image-like objects must expose set_data(data) or writable data") from exc
+    return hasattr(value, "data") and hasattr(value, "set_data") and not _is_torch_tensor(value)
 
 
 class TorchIOTransform(SampleTransform):
-    """TorchIO ``Subject`` adapter for MedAugmentX transforms.
+    """TorchIO adapter for one intensity image plus one optional registered label.
 
-    TorchIO remains an optional dependency. This adapter is duck-typed: it
-    looks for Subject-like mappings whose values expose ``.data`` and
-    ``set_data(data)``. The image and optional label tensor are converted
-    through :class:`MedVolume`, augmented together, then written back to the
-    same Image objects in the returned subject.
-
-    The adapter handles one intensity image plus one optional label map. Pass
-    explicit keys for multi-image subjects.
+    Actual TorchIO data is (C, X, Y, Z); spatial axes and affine are converted
+    together. Explicit keys must exist. Additional untransformed images are
+    rejected to prevent partially augmented multimodal subjects.
     """
 
     def __init__(
         self,
         transform: Transform,
         *,
-        image_key: str | None = "image",
-        label_key: str | None = "label",
+        image_key: str | None = None,
+        label_key: str | None = "auto",
         channel_dim: ChannelDim = 0,
         preserve_image_dtype: bool = False,
         preserve_label_dtype: bool = True,
@@ -407,125 +363,73 @@ class TorchIOTransform(SampleTransform):
     ) -> None:
         super().__init__(
             transform,
-            image_key="image" if image_key is None else image_key,
-            mask_key=label_key,
             channel_dim=channel_dim,
             preserve_image_dtype=preserve_image_dtype,
             preserve_mask_dtype=preserve_label_dtype,
         )
-        self.torchio_image_key = image_key
-        self.torchio_label_key = label_key
-        self.copy = bool(copy)
+        self.torchio_image_key, self.torchio_label_key, self.copy = image_key, label_key, copy
+
+    def _apply_images(self, image: Any, label: Any | None) -> None:
+        native = image.data.ndim == 4
+        affine = getattr(image, "affine", None)
+        if label is not None and affine is not None:
+            label_affine = getattr(label, "affine", None)
+            if label_affine is None or not np.allclose(label_affine, affine):
+                raise ValueError("TorchIO image and label patient-space grids disagree")
+        out_image, out_label, volume = self._augment(
+            image=image.data,
+            mask=None if label is None else label.data,
+            spacing=getattr(image, "spacing", None),
+            affine=affine,
+            reverse=native,
+        )
+        image.set_data(out_image)
+        if volume.affine is not None:
+            image.affine = (
+                volume.affine @ axis_permutation(volume.ndim) if native else volume.affine
+            )
+        if label is not None:
+            label.set_data(out_label)
+            if volume.affine is not None:
+                label.affine = image.affine.copy()
 
     def __call__(self, sample: Any) -> Any:
         if _looks_like_torchio_image(sample):
-            image = _copy_if_possible(sample) if self.copy else sample
-            out_image, _, _ = self._augment(
-                image=image.data,
-                mask=None,
-                spacing=self._spacing_from_image(image),
-                metadata=self._metadata_from_image(image, image_key=None),
+            out = copy.deepcopy(sample) if self.copy else sample
+            self._apply_images(out, None)
+            return out
+        if not isinstance(sample, Mapping) or not any(
+            _looks_like_torchio_image(v) for v in sample.values()
+        ):
+            return super().__call__(sample)
+        out = copy.deepcopy(sample) if self.copy else sample
+        images = {key: value for key, value in out.items() if _looks_like_torchio_image(value)}
+        labels = {
+            key: value
+            for key, value in images.items()
+            if "label" in type(value).__name__.lower()
+            or any(s in key.lower() for s in ("label", "mask", "seg"))
+            or getattr(value, "type", None) == "label"
+        }
+        image_key = self.torchio_image_key
+        if image_key is None:
+            candidates = list(set(images) - set(labels))
+            if len(candidates) != 1:
+                raise KeyError("Could not infer a unique TorchIO intensity image key")
+            image_key = candidates[0]
+        if image_key not in images:
+            raise KeyError(f"image_key={image_key!r} not found in TorchIO subject")
+        label_key = self.torchio_label_key
+        if label_key == "auto":
+            if len(labels) > 1:
+                raise KeyError("Could not infer a unique TorchIO label key")
+            label_key = next(iter(labels), None)
+        if label_key is not None and label_key not in images:
+            raise KeyError(f"label_key={label_key!r} not found in TorchIO subject")
+        selected = {image_key, label_key}
+        if set(images) - selected:
+            raise ValueError(
+                "Multiple images require a joint multimodal policy; refusing partial augmentation"
             )
-            _set_torchio_data(image, out_image)
-            return image
-        if _looks_like_torchio_subject(sample):
-            return self._call_subject(sample)
-        return super().__call__(sample)
-
-    def _call_subject(self, subject: Any) -> Any:
-        out = _copy_if_possible(subject) if self.copy else subject
-        image_key = self._resolve_image_key(out)
-        label_key = self._resolve_label_key(out, image_key)
-
-        image_obj = _subject_get(out, image_key)
-        label_obj = None if label_key is None else _subject_get(out, label_key)
-
-        if self.copy:
-            image_obj = _copy_if_possible(image_obj)
-            _subject_set(out, image_key, image_obj)
-            if label_key is not None and label_obj is not None:
-                label_obj = _copy_if_possible(label_obj)
-                _subject_set(out, label_key, label_obj)
-
-        out_image, out_label, _ = self._augment(
-            image=image_obj.data,
-            mask=None if label_obj is None else label_obj.data,
-            spacing=self._spacing_from_image(image_obj, fallback_subject=out),
-            metadata=self._metadata_from_image(image_obj, image_key=image_key),
-        )
-        _set_torchio_data(image_obj, out_image)
-        if label_obj is not None and out_label is not None:
-            _set_torchio_data(label_obj, out_label)
+        self._apply_images(out[image_key], None if label_key is None else out[label_key])
         return out
-
-    def _resolve_image_key(self, subject: Any) -> str:
-        preferred = self.torchio_image_key
-        if preferred is not None and _subject_contains(subject, preferred):
-            value = _subject_get(subject, preferred)
-            if not _looks_like_torchio_image(value):
-                raise TypeError(f"image_key={preferred!r} does not point to a TorchIO image")
-            return preferred
-
-        candidates = [
-            key
-            for key in _subject_keys(subject)
-            if _looks_like_torchio_image(_subject_get(subject, key))
-            and not _is_torchio_label(_subject_get(subject, key), key)
-        ]
-        if len(candidates) == 1:
-            return candidates[0]
-        if not candidates:
-            raise KeyError("Could not infer a TorchIO intensity image key")
-        raise KeyError(
-            "Could not infer a unique TorchIO intensity image key; pass image_key explicitly"
-        )
-
-    def _resolve_label_key(self, subject: Any, image_key: str) -> str | None:
-        preferred = self.torchio_label_key
-        if preferred is None:
-            return None
-        if _subject_contains(subject, preferred):
-            value = _subject_get(subject, preferred)
-            if not _looks_like_torchio_image(value):
-                raise TypeError(f"label_key={preferred!r} does not point to a TorchIO image")
-            return preferred
-
-        candidates = [
-            key
-            for key in _subject_keys(subject)
-            if key != image_key
-            and _looks_like_torchio_image(_subject_get(subject, key))
-            and _is_torchio_label(_subject_get(subject, key), key)
-        ]
-        if len(candidates) == 1:
-            return candidates[0]
-        return None
-
-    @staticmethod
-    def _spacing_from_image(
-        image: Any,
-        fallback_subject: Any | None = None,
-    ) -> tuple[float, ...] | None:
-        spacing = getattr(image, "spacing", None)
-        if spacing is None and fallback_subject is not None:
-            spacing = getattr(fallback_subject, "spacing", None)
-        if spacing is None:
-            return None
-        return tuple(float(s) for s in spacing)
-
-    @staticmethod
-    def _metadata_from_image(image: Any, image_key: str | None) -> dict[str, Any]:
-        metadata: dict[str, Any] = {}
-        affine = getattr(image, "affine", None)
-        if affine is not None:
-            metadata["affine"] = affine
-        if image_key is not None:
-            metadata["torchio_image_key"] = image_key
-        return metadata
-
-    def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}(transform={self.transform!r}, "
-            f"image_key={self.torchio_image_key!r}, label_key={self.torchio_label_key!r}, "
-            f"channel_dim={self.channel_dim!r})"
-        )

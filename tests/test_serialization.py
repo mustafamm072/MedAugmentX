@@ -1,4 +1,5 @@
 """Round-trip serialisation tests for all registered transforms."""
+
 import json
 
 import numpy as np
@@ -76,51 +77,54 @@ def vol3d():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("transform", [
-    GaussianNoise(std=0.05, p=0.9),
-    GaussianNoise(std=(0.01, 0.05), relative=True, clip=(0.0, 1.0)),
-    RicianNoise(std=0.02, p=0.8),
-    RicianNoise(std=(0.005, 0.02), clip=(0.0, 1.0)),
-    GammaCorrection(gamma=1.2, p=0.7),
-    GammaCorrection(gamma=(0.8, 1.2), invert=True),
-    RandomFlip(axes=("x",), p_per_axis=0.5),
-    RandomFlip(axes=("x", "y"), p_per_axis=0.7, p=0.8),
-    RandomAffine(rotation=10.0, p=0.7),
-    RandomAffine(rotation=(-5.0, 5.0), scale=(0.9, 1.1), translation=(-0.05, 0.05)),
-    AnatomicCrop(size=(16, 16), foreground_prob=0.5),
-    ElasticDeform(alpha=30.0, sigma=4.0, p=0.6),
-    ElasticDeform(alpha=(10.0, 10.0, 2.0), sigma=(4.0, 4.0, 1.0)),
-    SlabShift(max_shift=3, p=0.5),
-    SlabShift(max_shift=(0, 5)),
-    LimitedAngleBlur(arc_degrees=(15.0, 25.0), p=0.7),
-    LimitedAngleBlur(arc_degrees=20.0),
-    SliceDropout(num_slices=2, p=0.4),
-    SliceDropout(num_slices=(1, 3), affect_mask=True),
-    AnisotropicElastic(alpha=(80.0, 80.0, 6.0), sigma=(8.0, 8.0, 2.0)),
-    BiasField(alpha=0.3, coarse_shape=4, p=0.7),
-    WindowLevel(center_shift_frac=0.1, width_scale=(0.8, 1.2), p=0.6),
-    BrightnessContrast(brightness=0.05, contrast=(0.9, 1.1), p=0.5),
-    GaussianBlur(sigma=(0.5, 1.5), p=0.6),
-    SimulateLowResolution(zoom_range=(0.5, 0.9), per_axis=True, p=0.4),
-    GhostingArtifact(ghost_intensity=(0.05, 0.15), ghost_shift=(8, 32), p=0.3),
-    KSpaceDropout(dropout_fraction=(0.01, 0.05), phase_encode_axis="y", p=0.4),
-    BeamHardening(alpha=(0.02, 0.08), power=2.0, p=0.3),
-    CoarseDropout(num_holes=(1, 4), hole_size=(0.05, 0.2), fill_mask=True, p=0.5),
-    Resize(size=(16, 16), order=1),
-    Pad(size=(64, 64), mode="edge"),
-    CenterCrop(size=(16, 16)),
-    MedianBlur(ksize=(3, 5), p=0.5),
-    Sharpen(alpha=(0.2, 0.8), sigma=(0.7, 1.5), clip=(0.0, 1.0), p=0.6),
-    CLAHEContrast(clip_limit=(1.0, 3.0), grid=(8, 8), p=0.7),
-    HistogramMatch(reference=None, blend=(0.5, 1.0), p=0.5),
-    HistogramMatch(reference=[[0.1, 0.5], [0.9, 0.3]], blend=1.0),
-    MRIMotion(degrees=(1.0, 5.0), translation=(1.0, 4.0), num_movements=(1, 3), p=0.5),
-    MetalStreak(intensity=(0.1, 0.3), num_streaks=(6, 12), p=0.4),
-    ScatterSimulation(fraction=(0.1, 0.4), sigma=(15.0, 40.0), p=0.5),
-    GridArtifact(amplitude=(0.03, 0.1), frequency=(0.2, 0.45), axis="x", p=0.4),
-    CompressionVariation(scale=(0.85, 1.15), axis="y", p=0.5),
-    ReconStreak(amplitude=(0.05, 0.2), num_planes=(1, 3), decay=0.6, p=0.5),
-])
+@pytest.mark.parametrize(
+    "transform",
+    [
+        GaussianNoise(std=0.05, p=0.9),
+        GaussianNoise(std=(0.01, 0.05), relative=True, clip=(0.0, 1.0)),
+        RicianNoise(std=0.02, p=0.8),
+        RicianNoise(std=(0.005, 0.02), clip=(0.0, 1.0)),
+        GammaCorrection(gamma=1.2, p=0.7),
+        GammaCorrection(gamma=(0.8, 1.2), invert=True),
+        RandomFlip(axes=("x",), p_per_axis=0.5),
+        RandomFlip(axes=("x", "y"), p_per_axis=0.7, p=0.8),
+        RandomAffine(rotation=10.0, p=0.7),
+        RandomAffine(rotation=(-5.0, 5.0), scale=(0.9, 1.1), translation=(-0.05, 0.05)),
+        AnatomicCrop(size=(16, 16), foreground_prob=0.5),
+        ElasticDeform(alpha=30.0, sigma=4.0, p=0.6),
+        ElasticDeform(alpha=(10.0, 10.0, 2.0), sigma=(4.0, 4.0, 1.0)),
+        SlabShift(max_shift=3, p=0.5),
+        SlabShift(max_shift=(0, 5)),
+        LimitedAngleBlur(arc_degrees=(15.0, 25.0), p=0.7),
+        LimitedAngleBlur(arc_degrees=20.0),
+        SliceDropout(num_slices=2, p=0.4),
+        SliceDropout(num_slices=(1, 3), affect_mask=True),
+        AnisotropicElastic(alpha=(80.0, 80.0, 6.0), sigma=(8.0, 8.0, 2.0)),
+        BiasField(alpha=0.3, coarse_shape=4, p=0.7),
+        WindowLevel(center_shift_frac=0.1, width_scale=(0.8, 1.2), p=0.6),
+        BrightnessContrast(brightness=0.05, contrast=(0.9, 1.1), p=0.5),
+        GaussianBlur(sigma=(0.5, 1.5), p=0.6),
+        SimulateLowResolution(zoom_range=(0.5, 0.9), per_axis=True, p=0.4),
+        GhostingArtifact(ghost_intensity=(0.05, 0.15), ghost_shift=(8, 32), p=0.3),
+        KSpaceDropout(dropout_fraction=(0.01, 0.05), phase_encode_axis="y", p=0.4),
+        BeamHardening(alpha=(0.02, 0.08), power=2.0, p=0.3),
+        CoarseDropout(num_holes=(1, 4), hole_size=(0.05, 0.2), fill_mask=True, p=0.5),
+        Resize(size=(16, 16), order=1),
+        Pad(size=(64, 64), mode="edge"),
+        CenterCrop(size=(16, 16)),
+        MedianBlur(ksize=(3, 5), p=0.5),
+        Sharpen(alpha=(0.2, 0.8), sigma=(0.7, 1.5), clip=(0.0, 1.0), p=0.6),
+        CLAHEContrast(clip_limit=(1.0, 3.0), grid=(8, 8), p=0.7),
+        HistogramMatch(reference=None, blend=(0.5, 1.0), p=0.5),
+        HistogramMatch(reference=[[0.1, 0.5], [0.9, 0.3]], blend=1.0),
+        MRIMotion(degrees=(1.0, 5.0), translation=(1.0, 4.0), num_movements=(1, 3), p=0.5),
+        MetalStreak(intensity=(0.1, 0.3), num_streaks=(6, 12), p=0.4),
+        ScatterSimulation(fraction=(0.1, 0.4), sigma=(15.0, 40.0), p=0.5),
+        GridArtifact(amplitude=(0.03, 0.1), frequency=(0.2, 0.45), axis="x", p=0.4),
+        CompressionVariation(scale=(0.85, 1.15), axis="y", p=0.5),
+        ReconStreak(amplitude=(0.05, 0.2), num_planes=(1, 3), decay=0.6, p=0.5),
+    ],
+)
 def test_leaf_transform_json_round_trip(transform):
     d = transform.to_dict()
     assert "name" in d
@@ -128,7 +132,7 @@ def test_leaf_transform_json_round_trip(transform):
     # Re-serialise through JSON (validates JSON-serializability)
     json_str = to_json(transform)
     loaded = json.loads(json_str)
-    assert loaded["name"] == d["name"]
+    assert loaded["pipeline"]["name"] == d["name"]
     # Reconstruct and check type
     reconstructed = from_json(json_str)
     assert type(reconstructed) is type(transform)
@@ -140,9 +144,7 @@ def test_leaf_transform_json_round_trip(transform):
 
 
 def test_compose_round_trip(vol2d):
-    pipeline = Compose(
-        [GaussianNoise(std=0.05), GammaCorrection(gamma=(0.9, 1.1))], seed=0
-    )
+    pipeline = Compose([GaussianNoise(std=0.05), GammaCorrection(gamma=(0.9, 1.1))], seed=0)
     reconstructed = round_trip(pipeline)
     assert isinstance(reconstructed, Compose)
     assert len(reconstructed.transforms) == 2
@@ -193,18 +195,42 @@ def test_nested_pipeline_round_trip(vol2d):
 
 def test_registry_contains_all_known_transforms():
     expected = {
-        "Compose", "OneOf", "SomeOf",
-        "RandomAffine", "RandomFlip", "AnatomicCrop", "ElasticDeform",
-        "CoarseDropout", "Resize", "Pad", "CenterCrop",
-        "GaussianNoise", "RicianNoise", "GammaCorrection",
-        "BiasField", "WindowLevel", "BrightnessContrast",
-        "GaussianBlur", "MedianBlur", "SimulateLowResolution",
-        "Sharpen", "CLAHEContrast", "HistogramMatch",
-        "SlabShift", "LimitedAngleBlur", "SliceDropout", "AnisotropicElastic",
-        "CompressionVariation", "ReconStreak",
-        "GhostingArtifact", "KSpaceDropout", "MRIMotion",
-        "BeamHardening", "MetalStreak",
-        "ScatterSimulation", "GridArtifact",
+        "Compose",
+        "OneOf",
+        "SomeOf",
+        "RandomAffine",
+        "RandomFlip",
+        "AnatomicCrop",
+        "ElasticDeform",
+        "CoarseDropout",
+        "Resize",
+        "Pad",
+        "CenterCrop",
+        "GaussianNoise",
+        "RicianNoise",
+        "GammaCorrection",
+        "BiasField",
+        "WindowLevel",
+        "BrightnessContrast",
+        "GaussianBlur",
+        "MedianBlur",
+        "SimulateLowResolution",
+        "Sharpen",
+        "CLAHEContrast",
+        "HistogramMatch",
+        "SlabShift",
+        "LimitedAngleBlur",
+        "SliceDropout",
+        "AnisotropicElastic",
+        "CompressionVariation",
+        "ReconStreak",
+        "GhostingArtifact",
+        "KSpaceDropout",
+        "MRIMotion",
+        "BeamHardening",
+        "MetalStreak",
+        "ScatterSimulation",
+        "GridArtifact",
         "Guard",
     }
     assert expected.issubset(set(REGISTRY.keys()))
@@ -224,7 +250,7 @@ def test_to_json_produces_valid_json():
     t = Compose([GaussianNoise(std=0.05), GammaCorrection()], seed=0)
     s = to_json(t)
     parsed = json.loads(s)  # must not raise
-    assert parsed["name"] == "Compose"
+    assert parsed["pipeline"]["name"] == "Compose"
 
 
 def test_from_json_reconstructs_compose_pipeline():
@@ -334,9 +360,17 @@ def test_every_builtin_preserves_seed_and_draw_sequence(name, cls):
         np.testing.assert_array_equal(via_json(volume).image, expected)
 
 
-@pytest.mark.parametrize("document", [None, [], {"name": []}, {"name": "Compose", "params": []},
-                                      {"name": "Compose", "params": {"transforms": "bad"}},
-                                      {"name": "Compose", "typo": 1}])
+@pytest.mark.parametrize(
+    "document",
+    [
+        None,
+        [],
+        {"name": []},
+        {"name": "Compose", "params": []},
+        {"name": "Compose", "params": {"transforms": "bad"}},
+        {"name": "Compose", "typo": 1},
+    ],
+)
 def test_invalid_schema_has_clear_error(document):
     with pytest.raises(ValueError):
         from_dict(document)
@@ -364,7 +398,7 @@ def test_yaml_round_trip_and_recursive_alias():
     rt = from_yaml(to_yaml(t))
     assert rt.to_dict() == t.to_dict()
     with pytest.raises(ValueError, match="nesting"):
-        from_yaml('&a {name: Compose, params: {transforms: [*a]}}')
+        from_yaml("&a {name: Compose, params: {transforms: [*a]}}")
 
 
 def test_invalid_direct_registry_assignment_rejected(clean_registry):

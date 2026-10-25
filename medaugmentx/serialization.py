@@ -34,7 +34,11 @@ backward compatibility.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import math
+import warnings
+from numbers import Real
 from typing import TYPE_CHECKING, Any, Callable, TypeVar, overload
 
 if TYPE_CHECKING:
@@ -47,6 +51,7 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 REGISTRY: dict[str, type] = {}
+SCHEMA_VERSION = 1
 
 
 def _register_builtins() -> None:
@@ -107,6 +112,10 @@ def _register_builtins() -> None:
             "HistogramMatch": HistogramMatch,
         }
     )
+
+    from medaugmentx.transforms.intensity.normalize import NormalizeIntensity
+
+    REGISTRY["NormalizeIntensity"] = NormalizeIntensity
 
     # Tomosynthesis
     from medaugmentx.transforms.modality.tomosynthesis.blur import LimitedAngleBlur
@@ -217,9 +226,7 @@ def register_transform(
 
     def _decorate(klass: type) -> type:
         if not (isinstance(klass, type) and issubclass(klass, Transform)):
-            raise TypeError(
-                f"register_transform expects a Transform subclass, got {klass!r}"
-            )
+            raise TypeError(f"register_transform expects a Transform subclass, got {klass!r}")
         key = name if name is not None else klass.__name__
         existing = REGISTRY.get(key)
         if existing is not None and existing is not klass and not override:
@@ -264,6 +271,26 @@ def from_dict(d: dict[str, Any]) -> Transform:
     """
     from medaugmentx.core.base import Transform
 
+    _validate_values(d)
+    if isinstance(d, dict) and "schema_version" in d:
+        from medaugmentx._version import __version__
+
+        if set(d) != {"schema_version", "library_version", "pipeline", "policy_sha256"}:
+            raise ValueError("Malformed versioned policy fields")
+        if type(d["schema_version"]) is not int or d["schema_version"] != SCHEMA_VERSION:
+            raise ValueError("Unsupported policy schema version")
+        version = d["library_version"]
+        if not isinstance(version, str) or version.split(".")[0] != __version__.split(".")[0]:
+            raise ValueError("Policy library major version is incompatible")
+        if d["policy_sha256"] != _policy_hash(d["pipeline"]):
+            raise ValueError("Policy hash mismatch")
+        if version != __version__:
+            warnings.warn(
+                "Policy was created with a different package version; seeded output may change",
+                UserWarning,
+                stacklevel=2,
+            )
+        d = d["pipeline"]
     nodes = 0
 
     def build(node: Any, depth: int = 0) -> Transform:
@@ -297,6 +324,60 @@ def from_dict(d: dict[str, Any]) -> Transform:
         return cls(**params)
 
     return build(d)
+
+
+def _validate_values(value: Any) -> None:
+    """Bound traversal and reject nonfinite values/cycles before constructors run."""
+    active: set[int] = set()
+    count = 0
+
+    def visit(item: Any, depth: int) -> None:
+        nonlocal count
+        count += 1
+        if depth > 256 or count > 1_000_000:
+            raise ValueError("Policy parameter structure is too large or deeply nested")
+        if isinstance(item, Real) and not isinstance(item, int) and not math.isfinite(float(item)):
+            raise ValueError("Policy numbers must be finite")
+        if isinstance(item, (dict, list, tuple)):
+            identity = id(item)
+            if identity in active:
+                raise ValueError("Policy nesting cannot contain cycles")
+            active.add(identity)
+            for child in item.values() if isinstance(item, dict) else item:
+                visit(child, depth + 1)
+            active.remove(identity)
+        elif hasattr(item, "dtype"):
+            import numpy as np
+
+            if (
+                isinstance(item, np.ndarray)
+                and item.dtype.kind in "fc"
+                and not np.isfinite(item).all()
+            ):
+                raise ValueError("Policy numbers must be finite")
+
+    visit(value, 0)
+
+
+def _policy_hash(node: Any) -> str:
+    canonical = json.dumps(
+        _make_serialisable(node), sort_keys=True, separators=(",", ":"), allow_nan=False
+    )
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def policy_document(transform: Transform) -> dict[str, Any]:
+    """Versioned policy envelope with package version and a canonical SHA-256 hash."""
+    from medaugmentx._version import __version__
+
+    node = _make_serialisable(transform.to_dict())
+    _validate_values(node)
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "library_version": __version__,
+        "pipeline": node,
+        "policy_sha256": _policy_hash(node),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -348,7 +429,7 @@ def to_json(transform: Transform, indent: int = 2) -> str:
         A JSON string that can be saved to disk and passed to
         :func:`from_json` to reconstruct the pipeline.
     """
-    return json.dumps(_make_serialisable(transform.to_dict()), indent=indent, allow_nan=False)
+    return json.dumps(policy_document(transform), indent=indent, allow_nan=False)
 
 
 def from_json(s: str) -> Transform:
@@ -365,6 +446,13 @@ def from_json(s: str) -> Transform:
         parsed = json.loads(s, parse_constant=_reject_json_constant)
     except RecursionError as exc:
         raise ValueError("Pipeline document is nested too deeply") from exc
+    if isinstance(parsed, dict) and "schema_version" not in parsed:
+        warnings.warn(
+            "Loading an unversioned pre-1.0 policy; v1 geometry and preset semantics apply. "
+            "Re-export and review the migrated policy before use.",
+            UserWarning,
+            stacklevel=2,
+        )
     return from_dict(parsed)
 
 
@@ -392,7 +480,7 @@ def to_yaml(transform: Transform) -> str:
     except ImportError as exc:
         raise ImportError("YAML serialisation requires PyYAML: pip install pyyaml") from exc
     return yaml.safe_dump(
-        _make_serialisable(transform.to_dict()),
+        policy_document(transform),
         default_flow_style=False,
         allow_unicode=True,
         sort_keys=False,
@@ -422,11 +510,19 @@ def from_yaml(s: str) -> Transform:
         parsed = yaml.safe_load(s)
     except RecursionError as exc:
         raise ValueError("Pipeline document is nested too deeply") from exc
+    if isinstance(parsed, dict) and "schema_version" not in parsed:
+        warnings.warn(
+            "Loading an unversioned pre-1.0 policy; review v1 migration semantics",
+            UserWarning,
+            stacklevel=2,
+        )
     return from_dict(parsed)
 
 
 __all__ = [
     "REGISTRY",
+    "SCHEMA_VERSION",
+    "policy_document",
     "register_transform",
     "from_dict",
     "to_json",

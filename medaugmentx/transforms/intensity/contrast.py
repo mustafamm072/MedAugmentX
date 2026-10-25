@@ -1,4 +1,5 @@
 """Contrast & gamma transforms."""
+
 from __future__ import annotations
 
 from typing import Any, Union
@@ -6,6 +7,7 @@ from typing import Any, Union
 import numpy as np
 
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
 
@@ -39,7 +41,8 @@ class GammaCorrection(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
-        if isinstance(gamma, (int, float)):
+        validate_parameters(gamma=gamma, invert=invert)
+        if isinstance(gamma, (int, float, np.integer, np.floating)):
             self.gamma_range: tuple[float, float] = (float(gamma), float(gamma))
         else:
             lo, hi = float(gamma[0]), float(gamma[1])

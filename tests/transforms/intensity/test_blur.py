@@ -23,6 +23,7 @@ def vol3d():
 
 # ---- GaussianBlur ----
 
+
 def test_gaussian_blur_2d_smooths_image(vol2d):
     out = GaussianBlur(sigma=2.0, seed=0)(vol2d)
     # Blur reduces std
@@ -70,6 +71,7 @@ def test_gaussian_blur_to_dict_round_trip():
 
 
 # ---- SimulateLowResolution ----
+
 
 def test_low_res_shape_preserved_2d(vol2d):
     out = SimulateLowResolution(zoom_range=(0.5, 0.9), seed=0)(vol2d)

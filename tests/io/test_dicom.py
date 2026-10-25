@@ -1,3 +1,4 @@
+import uuid
 import warnings
 
 import numpy as np
@@ -21,14 +22,19 @@ def _write_dicom_slice(path, pixels: np.ndarray, *, series_uid, position: float,
     # Match the dataset encoding to TransferSyntaxUID on pydicom 2.x as well
     # as 3.x; older writers do not infer it from file_meta on initial save.
     ds = FileDataset(
-        str(path), {}, file_meta=file_meta, preamble=b"\0" * 128,
-        is_implicit_VR=False, is_little_endian=True,
+        str(path),
+        {},
+        file_meta=file_meta,
+        preamble=b"\0" * 128,
+        is_implicit_VR=False,
+        is_little_endian=True,
     )
     ds.PatientID = "test"
     ds.Modality = modality
     ds.Manufacturer = "TestVendor"
     ds.SeriesInstanceUID = series_uid
-    ds.StudyInstanceUID = generate_uid()
+    ds.StudyInstanceUID = "2.25." + str(uuid.uuid5(uuid.NAMESPACE_OID, series_uid).int)
+    ds.FrameOfReferenceUID = "2.25." + str(uuid.uuid5(uuid.NAMESPACE_DNS, series_uid).int)
     ds.SOPInstanceUID = file_meta.MediaStorageSOPInstanceUID
     ds.SOPClassUID = file_meta.MediaStorageSOPClassUID
 
@@ -55,7 +61,9 @@ def test_load_3d_series(tmp_path):
     series_uid = generate_uid()
     for i in range(5):
         slice_pixels = np.full((16, 16), 1024 + i * 100, dtype=np.uint16)
-        _write_dicom_slice(tmp_path / f"slice_{i}.dcm", slice_pixels, series_uid=series_uid, position=i * 1.5)
+        _write_dicom_slice(
+            tmp_path / f"slice_{i}.dcm", slice_pixels, series_uid=series_uid, position=i * 1.5
+        )
 
     vol = load_dicom_series(str(tmp_path))
     assert vol.image.shape == (5, 16, 16)
@@ -72,8 +80,12 @@ def test_load_3d_series(tmp_path):
 def test_multiple_series_rejected(tmp_path):
     s1 = generate_uid()
     s2 = generate_uid()
-    _write_dicom_slice(tmp_path / "a.dcm", np.zeros((8, 8), dtype=np.uint16), series_uid=s1, position=0)
-    _write_dicom_slice(tmp_path / "b.dcm", np.zeros((8, 8), dtype=np.uint16), series_uid=s2, position=1)
+    _write_dicom_slice(
+        tmp_path / "a.dcm", np.zeros((8, 8), dtype=np.uint16), series_uid=s1, position=0
+    )
+    _write_dicom_slice(
+        tmp_path / "b.dcm", np.zeros((8, 8), dtype=np.uint16), series_uid=s2, position=1
+    )
     with pytest.raises(ValueError, match="multiple DICOM series"):
         load_dicom_series(str(tmp_path))
 
@@ -94,7 +106,10 @@ def test_instance_numbers_are_not_physical_spacing(tmp_path):
         ds.InstanceNumber = i * 10
         ds.SpacingBetweenSlices = 2.5
         ds.save_as(path)
-    assert load_dicom_series(str(tmp_path)).spacing[0] == 2.5
+    with pytest.warns(UserWarning, match="unknown"):
+        volume = load_dicom_series(str(tmp_path), strict=False)
+    assert volume.spacing[0] == 2.5
+    assert volume.affine is None
 
 
 def test_missing_rescale_tags_do_not_inherit_other_slice(tmp_path):
@@ -116,17 +131,21 @@ def test_missing_rescale_tags_do_not_inherit_other_slice(tmp_path):
 def test_nonregular_slice_positions_rejected(tmp_path, positions):
     uid = generate_uid()
     for i, position in enumerate(positions):
-        _write_dicom_slice(tmp_path / f"{i}.dcm", np.zeros((4, 4)),
-                           series_uid=uid, position=position)
+        _write_dicom_slice(
+            tmp_path / f"{i}.dcm", np.zeros((4, 4)), series_uid=uid, position=position
+        )
     with pytest.raises(ValueError, match="distinct|irregular"):
         load_dicom_series(str(tmp_path))
 
 
-@pytest.mark.parametrize("tag,value", [
-    ("ImageOrientationPatient", [0, 1, 0, 1, 0, 0]),
-    ("PixelSpacing", [0.25, 0.5]),
-    ("SamplesPerPixel", 3),
-])
+@pytest.mark.parametrize(
+    "tag,value",
+    [
+        ("ImageOrientationPatient", [0, 1, 0, 1, 0, 0]),
+        ("PixelSpacing", [0.25, 0.5]),
+        ("SamplesPerPixel", 3),
+    ],
+)
 def test_inconsistent_or_color_dicom_rejected(tmp_path, tag, value):
     uid = generate_uid()
     for i in range(2):
@@ -156,3 +175,51 @@ def test_fixture_encoding_matches_transfer_syntax_on_rewrite(tmp_path):
         ds.save_as(path)
         restored = pydicom.dcmread(path)
         np.testing.assert_array_equal(restored.pixel_array, pixels)
+
+
+def test_regular_shear_preserves_all_patient_coordinates(tmp_path):
+    uid = generate_uid()
+    for i in range(3):
+        path = tmp_path / f"{i}.dcm"
+        _write_dicom_slice(path, np.full((4, 5), 1024), series_uid=uid, position=i)
+        ds = pydicom.dcmread(path)
+        ds.ImagePositionPatient = [10 + 0.5 * i, 20, 30 + i]
+        ds.save_as(path)
+    volume = load_dicom_series(str(tmp_path))
+    np.testing.assert_allclose(
+        volume.index_to_world([[0, 0, 0], [2, 1, 3]]), [[-10, -20, 30], [-12.5, -20.5, 32]]
+    )
+    assert volume.spacing[0] == pytest.approx(np.sqrt(1.25))
+    assert "patient_id" not in volume.metadata
+    assert (
+        load_dicom_series(str(tmp_path), include_patient_id=True).metadata["patient_id"] == "test"
+    )
+
+
+@pytest.mark.parametrize(
+    "tag,value,message",
+    [
+        ("NumberOfFrames", 2, "multiframe"),
+        ("ImageOrientationPatient", [2, 0, 0, 0, 0.5, 0], "orthogonal unit"),
+        ("SOPClassUID", "1.2.840.10008.5.1.4.1.1.4.1", "SOP class"),
+        ("RescaleSlope", 0, "rescale"),
+    ],
+)
+def test_unsupported_or_invalid_single_file_fails(tmp_path, tag, value, message):
+    path = tmp_path / "input.dcm"
+    _write_dicom_slice(path, np.zeros((4, 4)), series_uid=generate_uid(), position=0)
+    ds = pydicom.dcmread(path)
+    setattr(ds, tag, value)
+    ds.save_as(path)
+    with pytest.raises(ValueError, match=message):
+        load_dicom_series(str(path))
+
+
+def test_unreadable_candidates_are_reported(tmp_path):
+    _write_dicom_slice(tmp_path / "ok.dcm", np.zeros((4, 4)), series_uid=generate_uid(), position=0)
+    (tmp_path / "bad.dcm").write_text("corrupt")
+    with pytest.raises(ValueError, match="Unreadable"):
+        load_dicom_series(str(tmp_path))
+    with pytest.warns(UserWarning, match="Skipped"):
+        volume = load_dicom_series(str(tmp_path), strict=False)
+    assert len(volume.metadata["skipped_files"]) == 1

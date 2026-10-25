@@ -14,6 +14,7 @@ Run with:
 
     python examples/keypoints_bboxes.py
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -68,16 +69,22 @@ def main() -> None:
     # negative) coordinates; prune them explicitly when you need clean labels.
     cropped = AnatomicCrop(size=(96, 96), foreground_prob=0.0, seed=1)(out)
     print("\nAfter a random crop (before pruning):")
-    print("  keypoints in frame?", cropped.num_keypoints, "point(s), coords:",
-          np.round(cropped.keypoints[0], 1))
+    print(
+        "  keypoints in frame?",
+        cropped.num_keypoints,
+        "point(s), coords:",
+        np.round(cropped.keypoints[0], 1),
+    )
 
     pruned = cropped.remove_out_of_bounds_targets(min_visibility=0.25)
     print("After remove_out_of_bounds_targets(min_visibility=0.25):")
     print(f"  {pruned.num_keypoints} keypoint(s), {pruned.num_bboxes} box(es) retained")
 
     # Intensity/artifact transforms never move targets — only spatial ones do.
-    print("\nTargets are only touched by spatial transforms; intensity/artifact",
-          "transforms pass them through unchanged.")
+    print(
+        "\nTargets are only touched by spatial transforms; intensity/artifact",
+        "transforms pass them through unchanged.",
+    )
 
 
 if __name__ == "__main__":

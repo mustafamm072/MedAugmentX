@@ -3,6 +3,7 @@
 Print a reproducible experiment record using only synthetic data. No input
 images, patient metadata, filesystem paths, or network access are needed.
 """
+
 from __future__ import annotations
 
 import hashlib

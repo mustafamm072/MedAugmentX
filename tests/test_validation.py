@@ -1,4 +1,5 @@
 """Tests for the plausibility validator and the Guard transform."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -78,11 +79,11 @@ def test_intensity_bounds_warns_then_errors():
 
     warn_report = VolumeValidator(intensity_bounds=(0.0, 1.0)).validate(vol)
     assert warn_report.ok  # warning only
-    assert any(i.check == "intensity_bounds" and i.severity == "warning" for i in warn_report.issues)
+    assert any(
+        i.check == "intensity_bounds" and i.severity == "warning" for i in warn_report.issues
+    )
 
-    err_report = VolumeValidator(
-        intensity_bounds=(0.0, 1.0), strict_bounds=True
-    ).validate(vol)
+    err_report = VolumeValidator(intensity_bounds=(0.0, 1.0), strict_bounds=True).validate(vol)
     assert not err_report.ok
 
 
@@ -100,9 +101,9 @@ def test_preserve_mask_labels_detects_wiped_structure(vol3d):
 
 def test_max_foreground_loss(vol3d):
     wiped = WipeMask().apply(vol3d)
-    report = VolumeValidator(
-        preserve_mask_labels=False, max_foreground_loss=0.5
-    ).validate(wiped, reference=vol3d)
+    report = VolumeValidator(preserve_mask_labels=False, max_foreground_loss=0.5).validate(
+        wiped, reference=vol3d
+    )
     assert any(i.check == "foreground_loss" for i in report.errors)
 
 

@@ -5,8 +5,8 @@ title: MedAugmentX
 abstract: "Clinically-aware medical image augmentation for AI training (MRI, CT, X-ray, tomosynthesis)."
 authors:
   - name: MedAugmentX Contributors
-version: 0.10.0
-date-released: "2026-09-05"
+version: 1.0.0
+date-released: "2026-10-25"
 repository-code: "https://github.com/mustafamm072/MedAugmentX"
 url: "https://github.com/mustafamm072/MedAugmentX"
 identifiers:

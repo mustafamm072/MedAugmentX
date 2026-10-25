@@ -57,3 +57,5 @@ htmlcov/
 !tests/**/*.nii
 !tests/**/*.nii.gz
 docs/_build/
+
+preview-output/

@@ -1,4 +1,5 @@
 """Histogram matching to a reference intensity distribution."""
+
 from __future__ import annotations
 
 from typing import Any, Union
@@ -6,13 +7,16 @@ from typing import Any, Union
 import numpy as np
 
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
 
 Range = Union[float, tuple[float, float]]
 
 
-def _match_to_reference(image: np.ndarray, ref_values: np.ndarray, ref_quantiles: np.ndarray) -> np.ndarray:
+def _match_to_reference(
+    image: np.ndarray, ref_values: np.ndarray, ref_quantiles: np.ndarray
+) -> np.ndarray:
     """Map ``image`` so its CDF matches the reference (values, quantiles)."""
     flat = image.ravel()
     src_values, inverse, counts = np.unique(flat, return_inverse=True, return_counts=True)
@@ -35,11 +39,9 @@ class HistogramMatch(Transform):
     are remapped.  The mask is never modified.
 
     .. note::
-        The reference array is serialised inline (as a nested list).  Keep it
-        small — a representative slice or a downsampled volume is plenty.  If
-        ``reference`` is ``None`` the transform is an identity no-op, which
-        lets a pipeline round-trip cleanly when you do not want to persist a
-        reference array.
+        Policies store a compact sorted quantile summary, rather than the
+        source image. This summary still describes its intensity distribution;
+        inspect it before sharing. A missing reference is an identity operation.
 
     Args:
         reference: Array-like whose histogram is the matching target, or
@@ -50,6 +52,8 @@ class HistogramMatch(Transform):
         n_quantiles: Number of quantiles used to summarise the reference CDF.
         p: Probability of applying.
         seed: RNG seed.
+        reference_quantiles: Optional serialized sorted quantile summary instead
+            of a reference image; v1 policies store this compact representation.
     """
 
     def __init__(
@@ -59,9 +63,11 @@ class HistogramMatch(Transform):
         n_quantiles: int = 256,
         p: float = 1.0,
         seed: SeedLike = None,
+        reference_quantiles: Any = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
-        if isinstance(blend, (int, float)):
+        validate_parameters(reference=reference, blend=blend, n_quantiles=n_quantiles)
+        if isinstance(blend, (int, float, np.integer, np.floating)):
             v = float(blend)
             if not 0.0 <= v <= 1.0:
                 raise ValueError("blend must be in [0, 1]")
@@ -76,19 +82,39 @@ class HistogramMatch(Transform):
             raise ValueError("n_quantiles must be >= 2")
         self.n_quantiles = int(n_quantiles)
 
-        if reference is None:
-            self.reference: np.ndarray | None = None
-            self._ref_values: np.ndarray | None = None
-            self._ref_quantiles: np.ndarray | None = None
+        self.reference: np.ndarray | None
+        self._ref_values: np.ndarray | None
+        self._ref_quantiles: np.ndarray | None
+        if reference is not None and reference_quantiles is not None:
+            raise ValueError("Supply reference or reference_quantiles, not both")
+        if reference_quantiles is not None:
+            ref = np.asarray(reference_quantiles, dtype=np.float64)
+            if (
+                ref.ndim != 1
+                or len(ref) < 2
+                or not np.isfinite(ref).all()
+                or (np.diff(ref) < 0).any()
+            ):
+                raise ValueError("reference_quantiles must be finite, sorted, and one-dimensional")
+            self.reference = None
+            self.n_quantiles = len(ref)
+            self._ref_values = ref.copy()
+            self._ref_quantiles = np.linspace(0.0, 1.0, len(ref))
+        elif reference is None:
+            self.reference = None
+            self._ref_values = None
+            self._ref_quantiles = None
         else:
-            ref = np.asarray(reference, dtype=np.float64)
+            ref = np.array(reference, dtype=np.float64, copy=True)
+            if not ref.size:
+                raise ValueError("reference cannot be empty")
             self.reference = ref
             qs = np.linspace(0.0, 1.0, self.n_quantiles)
             self._ref_values = np.quantile(ref.ravel(), qs)
             self._ref_quantiles = qs
 
     def apply(self, volume: MedVolume) -> MedVolume:
-        if self.reference is None or self._ref_values is None or self._ref_quantiles is None:
+        if self._ref_values is None or self._ref_quantiles is None:
             return volume
         image = as_float32(volume.image)
         matched = _match_to_reference(
@@ -103,7 +129,10 @@ class HistogramMatch(Transform):
         return {
             "name": self.__class__.__name__,
             "params": {
-                "reference": None if self.reference is None else self.reference.tolist(),
+                "reference": None,
+                "reference_quantiles": None
+                if self._ref_values is None
+                else self._ref_values.tolist(),
                 "blend": br[0] if br[0] == br[1] else list(br),
                 "n_quantiles": self.n_quantiles,
                 "p": self.p,

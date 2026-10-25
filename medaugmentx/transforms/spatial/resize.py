@@ -7,16 +7,19 @@ All three keep the mask in lockstep with the image: resampling uses
 nearest-neighbour for the mask, padding fills the mask with ``0``, and
 cropping slices image and mask identically.
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
-from scipy.ndimage import zoom
+from scipy.ndimage import gaussian_filter, zoom
 
 from medaugmentx.core import geometry
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
+from medaugmentx.core.physical import grid_translation
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
 
@@ -33,6 +36,8 @@ class Resize(Transform):
         order: Spline order for the image (0–3).  Mask is always ``order=0``.
         p: Probability of applying.
         seed: RNG seed (unused — Resize is deterministic, kept for API parity).
+        antialias: Prefilter the image before downsampling; never filters masks.
+        clip_output: Clamp interpolation overshoot to the input intensity range.
     """
 
     def __init__(
@@ -41,14 +46,19 @@ class Resize(Transform):
         order: int = 1,
         p: float = 1.0,
         seed: SeedLike = None,
+        antialias: bool = True,
+        clip_output: bool = False,
     ) -> None:
         super().__init__(p=p, seed=seed)
+        validate_parameters(size=size, order=order)
         self.size: tuple[int, ...] = tuple(int(s) for s in size)
         if any(s <= 0 for s in self.size):
             raise ValueError(f"size entries must be > 0, got {size}")
         if order not in (0, 1, 2, 3):
             raise ValueError("order must be 0, 1, 2, or 3")
         self.order = int(order)
+        self.antialias = bool(antialias)
+        self.clip_output = bool(clip_output)
 
     def apply(self, volume: MedVolume) -> MedVolume:
         if len(self.size) != volume.ndim:
@@ -61,36 +71,50 @@ class Resize(Transform):
 
         factors = [t / s for t, s in zip(self.size, old_shape)]
         image = as_float32(volume.image)
-        new_image = zoom(image, factors, order=self.order, mode="reflect")
+        if self.antialias and any(f < 1 for f in factors):
+            image = gaussian_filter(image, sigma=[max(0.0, (1 / f - 1) / 2) for f in factors])
+        new_image = zoom(image, factors, order=self.order, mode="reflect", grid_mode=True)
+        if self.clip_output:
+            new_image = np.clip(new_image, volume.image.min(), volume.image.max())
         # zoom can be off-by-one on rounding; force exact target shape.
         new_image = _force_shape(new_image, self.size, fill=0.0)
 
         new_mask = None
         if volume.mask is not None:
-            m = zoom(volume.mask, factors, order=0, mode="nearest")
+            m = zoom(volume.mask, factors, order=0, mode="nearest", grid_mode=True)
             new_mask = _force_shape(m, self.size, fill=0).astype(volume.mask.dtype, copy=False)
 
-        new_spacing = tuple(
-            sp * o / t for sp, o, t in zip(volume.spacing, old_shape, self.size)
-        )
-        # scipy zoom aligns the first and last voxel centres. Singleton
-        # axes have no centre-to-centre extent and map to coordinate zero.
-        target_factors = np.asarray([
-            (t - 1) / (s - 1) if s > 1 else 0.0
-            for t, s in zip(self.size, old_shape)
-        ], dtype=np.float64)
-        point_map = geometry.scale_map(target_factors)
+        new_spacing = tuple(sp * o / t for sp, o, t in zip(volume.spacing, old_shape, self.size))
+        # Preserve full voxel extent. Output centre q samples input
+        # (q + .5) * old/new - .5, including singleton axes.
+        target_factors = np.asarray(factors)
+
+        def point_map(pts):
+            return (pts + 0.5) * target_factors - 0.5
+
+        pull = np.eye(4)
+        for ax, factor in enumerate(factors):
+            pull[ax, ax] = 1 / factor
+            pull[ax, 3] = (1 / factor - 1) / 2
         return volume.warp(
             point_map,
             image=new_image.astype(np.float32, copy=False),
             mask=new_mask,
             spacing=new_spacing,
+            grid_map=pull,
         )
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.__class__.__name__,
-            "params": {"size": list(self.size), "order": self.order, "p": self.p, "seed": self._seed},
+            "params": {
+                "size": list(self.size),
+                "order": self.order,
+                "p": self.p,
+                "seed": self._seed,
+                "antialias": self.antialias,
+                "clip_output": self.clip_output,
+            },
         }
 
 
@@ -119,6 +143,7 @@ class Pad(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
+        validate_parameters(size=size, cval=cval)
         self.size: tuple[int, ...] = tuple(int(s) for s in size)
         if any(s <= 0 for s in self.size):
             raise ValueError(f"size entries must be > 0, got {size}")
@@ -155,7 +180,10 @@ class Pad(Transform):
         before = np.asarray([b for b, _ in widths], dtype=np.float64)
         point_map = geometry.translate_map(before)
         return volume.warp(
-            point_map, image=new_image.astype(np.float32, copy=False), mask=new_mask
+            point_map,
+            image=new_image.astype(np.float32, copy=False),
+            mask=new_mask,
+            grid_map=grid_translation(-before),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -190,6 +218,7 @@ class CenterCrop(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
+        validate_parameters(size=size)
         self.size: tuple[int, ...] = tuple(int(s) for s in size)
         if any(s <= 0 for s in self.size):
             raise ValueError(f"size entries must be > 0, got {size}")
@@ -210,7 +239,9 @@ class CenterCrop(Transform):
         new_image = volume.image[region].copy()
         new_mask = None if volume.mask is None else volume.mask[region].copy()
         point_map = geometry.translate_map(-np.asarray(starts, dtype=np.float64))
-        return volume.warp(point_map, image=new_image, mask=new_mask)
+        return volume.warp(
+            point_map, image=new_image, mask=new_mask, grid_map=grid_translation(starts)
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {

@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.utils import SeedLike
 from medaugmentx.core.volume import MedVolume
 from medaugmentx.transforms.spatial.elastic import ElasticDeform
@@ -32,6 +33,11 @@ class AnisotropicElastic(Transform):
         order: Image interpolation order (mask uses 0 always).
         p: Probability of applying.
         seed: RNG seed.
+        units: ``"voxels"`` or ``"mm"`` for field parameters.
+        max_gradient: Optional sampled displacement-gradient norm bound.
+        min_jacobian: Optional minimum sampled pull-map Jacobian determinant.
+        max_displacement: Optional per-component displacement cap in units.
+        bbox_mode: Conservative bounds, explicit corner approximation, or rejection.
     """
 
     def __init__(
@@ -41,8 +47,14 @@ class AnisotropicElastic(Transform):
         order: int = 1,
         p: float = 1.0,
         seed: SeedLike = None,
+        units: str = "voxels",
+        max_gradient: float | None = 0.5,
+        min_jacobian: float | None = None,
+        max_displacement: float | None = None,
+        bbox_mode: str = "conservative",
     ) -> None:
         super().__init__(p=p, seed=seed)
+        validate_parameters(alpha=alpha, sigma=sigma, order=order)
         self.alpha = tuple(float(a) for a in alpha)
         self.sigma = tuple(float(s) for s in sigma)
         if len(self.alpha) != 3 or len(self.sigma) != 3:
@@ -53,6 +65,11 @@ class AnisotropicElastic(Transform):
             order=order,
             p=1.0,
             seed=self.rng,
+            units=units,
+            max_gradient=max_gradient,
+            min_jacobian=min_jacobian,
+            max_displacement=max_displacement,
+            bbox_mode=bbox_mode,
         )
 
     def set_rng(self, rng: np.random.Generator) -> None:
@@ -74,5 +91,10 @@ class AnisotropicElastic(Transform):
                 "order": self._inner.order,
                 "p": self.p,
                 "seed": self._seed,
+                "units": self._inner.units,
+                "max_gradient": self._inner.max_gradient,
+                "min_jacobian": self._inner.min_jacobian,
+                "max_displacement": self._inner.max_displacement,
+                "bbox_mode": self._inner.bbox_mode,
             },
         }

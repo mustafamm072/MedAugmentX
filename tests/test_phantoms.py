@@ -33,8 +33,9 @@ def test_phantom_declares_its_modality(factory):
     assert factory().modality in {"MR", "CT", "DX", "DBT"}
 
 
-@pytest.mark.parametrize("factory", [mri_phantom, ct_phantom, xray_phantom],
-                         ids=lambda f: f.__name__)
+@pytest.mark.parametrize(
+    "factory", [mri_phantom, ct_phantom, xray_phantom], ids=lambda f: f.__name__
+)
 def test_two_dimensional_phantoms_honour_size(factory):
     assert factory().shape == (256, 256)
     assert factory(size=64).shape == (64, 64)

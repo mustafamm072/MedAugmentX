@@ -24,6 +24,7 @@ def vol3d():
 
 # ---- Resize ----
 
+
 def test_resize_to_target_shape_2d(vol2d):
     out = Resize(size=(20, 30))(vol2d)
     assert out.image.shape == (20, 30)
@@ -77,6 +78,7 @@ def test_force_shape_constant_pads_with_requested_fill():
 
 # ---- Pad ----
 
+
 def test_pad_grows_to_target(vol2d):
     out = Pad(size=(50, 70))(vol2d)
     assert out.image.shape == (50, 70)
@@ -107,6 +109,7 @@ def test_pad_to_dict_round_trip():
 
 
 # ---- CenterCrop ----
+
 
 def test_center_crop_to_target(vol2d):
     out = CenterCrop(size=(20, 20))(vol2d)

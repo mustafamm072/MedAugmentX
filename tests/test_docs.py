@@ -13,6 +13,7 @@ The docs tree is absent when the suite is run against an installed wheel
 outside the source checkout; there is no documentation to guard in that case,
 so the module skips.
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -79,17 +80,14 @@ def test_transform_documents_every_parameter(cls):
     """
     doc = inspect.getdoc(cls) or ""
     undocumented = [name for name in inventory.parameters(cls) if f"{name}:" not in doc]
-    assert not undocumented, (
-        f"{cls.__name__} does not document {undocumented} in its Args section."
-    )
+    assert not undocumented, f"{cls.__name__} does not document {undocumented} in its Args section."
 
 
 def test_categories_do_not_overlap():
     """Overlapping categories would emit a transform twice."""
     for cls in TRANSFORMS:
         matches = [
-            key for key, _heading, _blurb in inventory.CATEGORIES
-            if cls.__module__.startswith(key)
+            key for key, _heading, _blurb in inventory.CATEGORIES if cls.__module__.startswith(key)
         ]
         longest = max(matches, key=len)
         assert all(longest.startswith(m) for m in matches), (
@@ -107,8 +105,16 @@ def test_targets_column_matches_documented_behaviour():
     wrong and readers are being told two different things.
     """
     expected_warping = {
-        "RandomFlip", "RandomAffine", "ElasticDeform", "AnisotropicElastic", "AnatomicCrop",
-        "CenterCrop", "Pad", "Resize", "SlabShift", "CompressionVariation",
+        "RandomFlip",
+        "RandomAffine",
+        "ElasticDeform",
+        "AnisotropicElastic",
+        "AnatomicCrop",
+        "CenterCrop",
+        "Pad",
+        "Resize",
+        "SlabShift",
+        "CompressionVariation",
     }
     actual = {cls.__name__ for cls in TRANSFORMS if inventory.warps_targets(cls)}
     assert actual == expected_warping

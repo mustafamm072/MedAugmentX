@@ -46,7 +46,10 @@ from typing import Any
 
 import numpy as np
 
+from medaugmentx.core import geometry
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import finite_values
+from medaugmentx.core.physical import affine_spacing, validate_affine
 from medaugmentx.core.utils import SeedLike, derive_rng
 from medaugmentx.core.volume import MedVolume
 
@@ -150,6 +153,9 @@ class VolumeValidator:
         max_intensity_shift: When a reference is given, warn if the image mean
             moved by more than this many reference standard deviations — a coarse
             distribution-drift signal.
+        check_geometry: Check finite targets, valid spacing, and affine coherence.
+        require_geometry: Fail when patient geometry is unknown.
+        foreground_measure: ``"physical"`` area/volume per label, or ``"voxels"``.
     """
 
     def __init__(
@@ -164,7 +170,19 @@ class VolumeValidator:
         preserve_mask_labels: bool = True,
         max_foreground_loss: float | None = None,
         max_intensity_shift: float | None = None,
+        check_geometry: bool = True,
+        require_geometry: bool = False,
+        foreground_measure: str = "physical",
     ) -> None:
+        for name, value in (
+            ("intensity_bounds", intensity_bounds),
+            ("min_foreground_fraction", min_foreground_fraction),
+            ("max_foreground_loss", max_foreground_loss),
+            ("max_intensity_shift", max_intensity_shift),
+        ):
+            finite_values(value, name)
+        if foreground_measure not in ("physical", "voxels"):
+            raise ValueError("foreground_measure must be physical or voxels")
         if intensity_bounds is not None:
             lo, hi = intensity_bounds
             if not lo < hi:
@@ -186,10 +204,11 @@ class VolumeValidator:
         self.preserve_mask_labels = bool(preserve_mask_labels)
         self.max_foreground_loss = max_foreground_loss
         self.max_intensity_shift = max_intensity_shift
+        self.check_geometry = bool(check_geometry)
+        self.require_geometry = bool(require_geometry)
+        self.foreground_measure = foreground_measure
 
-    def validate(
-        self, volume: MedVolume, reference: MedVolume | None = None
-    ) -> ValidationReport:
+    def validate(self, volume: MedVolume, reference: MedVolume | None = None) -> ValidationReport:
         """Run all enabled checks and return a :class:`ValidationReport`.
 
         Args:
@@ -205,6 +224,48 @@ class VolumeValidator:
 
         issues: list[ValidationIssue] = []
         image = volume.image
+        if image.ndim not in (2, 3) or image.size == 0 or image.dtype.kind not in "buif":
+            return ValidationReport(
+                (
+                    ValidationIssue(
+                        "image_structure", "error", "image must be non-empty real 2D/3D data"
+                    ),
+                )
+            )
+        if volume.mask is not None and (
+            volume.mask.dtype.kind not in "buif"
+            or not np.isfinite(volume.mask).all()
+            or not np.equal(volume.mask, np.rint(volume.mask)).all()
+        ):
+            issues.append(
+                ValidationIssue("mask_values", "error", "mask labels must be finite integers")
+            )
+        if self.require_geometry and volume.affine is None:
+            issues.append(ValidationIssue("geometry", "error", "patient geometry is unknown"))
+        if self.check_geometry:
+            try:
+                if (
+                    len(volume.spacing) != volume.ndim
+                    or not np.isfinite(volume.spacing).all()
+                    or min(volume.spacing) <= 0
+                ):
+                    raise ValueError("spacing must be finite, positive, and match image dimensions")
+                if volume.affine is not None:
+                    affine = validate_affine(volume.affine)
+                    if not np.allclose(affine_spacing(affine, volume.ndim), volume.spacing):
+                        raise ValueError("affine and spacing disagree")
+                for coords, labels, name, coerce in (
+                    (volume.keypoints, volume.keypoint_labels, "keypoints", geometry.as_keypoints),
+                    (volume.bboxes, volume.bbox_labels, "bboxes", geometry.as_bboxes),
+                ):
+                    if coords is not None:
+                        coerce(coords, volume.ndim)
+                        if labels is not None and (labels.ndim != 1 or len(labels) != len(coords)):
+                            raise ValueError(f"{name} labels are not aligned")
+                    elif labels is not None:
+                        raise ValueError(f"{name} labels have no coordinates")
+            except (ValueError, TypeError) as exc:
+                issues.append(ValidationIssue("geometry", "error", str(exc)))
 
         if self.require_finite and not np.all(np.isfinite(image)):
             n_bad = int(np.count_nonzero(~np.isfinite(image)))
@@ -216,7 +277,7 @@ class VolumeValidator:
 
         # A constant image is only diagnosable when the values are finite.
         if self.forbid_constant and np.all(np.isfinite(image)) and image.size > 0:
-            if float(np.ptp(image)) == 0.0:
+            if float(np.max(image)) == float(np.min(image)):
                 issues.append(
                     ValidationIssue(
                         "constant",
@@ -262,19 +323,23 @@ class VolumeValidator:
                 )
 
         if reference is not None:
-            issues.extend(self._comparative_issues(volume, reference))
+            if not isinstance(reference, MedVolume):
+                raise TypeError("reference must be a MedVolume")
+            if not any(
+                i.check in ("geometry", "mask_values", "mask_shape") and i.severity == "error"
+                for i in issues
+            ):
+                try:
+                    issues.extend(self._comparative_issues(volume, reference))
+                except (ValueError, TypeError, np.linalg.LinAlgError) as exc:
+                    issues.append(ValidationIssue("comparison", "error", str(exc)))
 
         return ValidationReport(tuple(issues))
 
-    def _comparative_issues(
-        self, volume: MedVolume, reference: MedVolume
-    ) -> list[ValidationIssue]:
+    def _comparative_issues(self, volume: MedVolume, reference: MedVolume) -> list[ValidationIssue]:
         issues: list[ValidationIssue] = []
 
-        if (
-            self.preserve_mask_labels
-            and reference.mask is not None
-        ):
+        if self.preserve_mask_labels and reference.mask is not None:
             before = set(np.unique(reference.mask).tolist())
             after = set() if volume.mask is None else set(np.unique(volume.mask).tolist())
             lost = sorted(label for label in before - after if label != 0)
@@ -287,20 +352,25 @@ class VolumeValidator:
                     )
                 )
 
-        if (
-            self.max_foreground_loss is not None
-            and reference.mask is not None
-        ):
-            before_fg = int(np.count_nonzero(reference.mask))
-            after_fg = 0 if volume.mask is None else int(np.count_nonzero(volume.mask))
-            if before_fg > 0:
-                loss = 1.0 - (after_fg / before_fg)
+        if self.max_foreground_loss is not None and reference.mask is not None:
+            before_unit = reference.voxel_volume if self.foreground_measure == "physical" else 1.0
+            after_unit = volume.voxel_volume if self.foreground_measure == "physical" else 1.0
+            for label in np.unique(reference.mask):
+                if label == 0:
+                    continue
+                before_fg = np.count_nonzero(reference.mask == label) * before_unit
+                after_fg = (
+                    0
+                    if volume.mask is None
+                    else np.count_nonzero(volume.mask == label) * after_unit
+                )
+                loss = 1.0 - after_fg / max(before_fg, 1e-30)
                 if loss > self.max_foreground_loss:
                     issues.append(
                         ValidationIssue(
                             "foreground_loss",
                             "error",
-                            f"mask foreground shrank by {loss:.1%} "
+                            f"mask label {label} {self.foreground_measure} foreground shrank by {loss:.1%} "
                             f"(> {self.max_foreground_loss:.1%} allowed)",
                         )
                     )
@@ -337,6 +407,9 @@ class VolumeValidator:
             "preserve_mask_labels": self.preserve_mask_labels,
             "max_foreground_loss": self.max_foreground_loss,
             "max_intensity_shift": self.max_intensity_shift,
+            "check_geometry": self.check_geometry,
+            "require_geometry": self.require_geometry,
+            "foreground_measure": self.foreground_measure,
         }
 
     @classmethod
@@ -379,6 +452,8 @@ class Guard(Transform):
             draw (ignored otherwise). Each attempt receives an isolated input copy.
         p: Probability of applying the wrapped transform at all.
         seed: Seed for the retry re-draw stream.
+        catch_errors: Convert ValueError/FloatingPointError to failed reports;
+            other exceptions always propagate. False propagates all exceptions.
     """
 
     def __init__(
@@ -389,13 +464,14 @@ class Guard(Transform):
         retries: int = 1,
         p: float = 1.0,
         seed: SeedLike = None,
+        catch_errors: bool = False,
     ) -> None:
         super().__init__(p=p, seed=seed)
         if not isinstance(transform, Transform):
             raise TypeError(f"Guard expects a Transform, got {type(transform).__name__}")
         if on_fail not in ON_FAIL_MODES:
             raise ValueError(f"on_fail must be one of {ON_FAIL_MODES}, got {on_fail!r}")
-        if int(retries) < 1:
+        if not isinstance(retries, (int, np.integer)) or isinstance(retries, bool) or retries < 1:
             raise ValueError("retries must be >= 1")
 
         if validator is None:
@@ -406,9 +482,12 @@ class Guard(Transform):
             raise TypeError("validator must be a VolumeValidator, a mapping, or None")
 
         self.transform = transform
+        self._adopt_children([transform])
         self.validator = validator
         self.on_fail = on_fail
         self.retries = int(retries)
+        self.catch_errors = bool(catch_errors)
+        self.reset_stats()
         # Reseed the child at construction so a standalone ``Guard(t, seed=...)``
         # is reproducible from its own seed, mirroring ``Compose``. This
         # deliberately overrides any seed the wrapped transform was built with.
@@ -425,6 +504,8 @@ class Guard(Transform):
 
     def apply(self, volume: MedVolume) -> MedVolume:
         reference = volume
+        self._stats["calls"] += 1
+        reports = []
         attempts = self.retries if self.on_fail == "retry" else 1
         last_report: ValidationReport | None = None
 
@@ -432,14 +513,58 @@ class Guard(Transform):
             if attempt > 0:
                 # Fresh randomness for each retry, deterministic given the seed.
                 self._reseed_child()
-            candidate = self.transform(reference.copy())
-            report = self.validator.validate(candidate, reference)
+            self._stats["attempts"] += 1
+            try:
+                candidate = self.transform(reference.copy())
+                report = self.validator.validate(candidate, reference)
+            except (ValueError, FloatingPointError) as exc:
+                self._stats["exceptions"] += 1
+                if not self.catch_errors:
+                    raise
+                candidate = reference
+                report = ValidationReport(
+                    (
+                        ValidationIssue(
+                            "transform_exception", "error", f"{type(exc).__name__}: {exc}"
+                        ),
+                    )
+                )
+            reports.append(report)
+            self._last_reports: tuple[ValidationReport, ...] = tuple(reports)
             if report.ok:
+                self._stats["accepted"] += 1
+                self._stats["warnings"] += len(report.warnings)
                 return candidate
+            self._stats["rejected"] += 1
+            for issue in report.errors:
+                self._reasons[issue.check] = self._reasons.get(issue.check, 0) + 1
             last_report = report
 
         assert last_report is not None
         return self._handle_failure(reference, candidate, last_report)
+
+    def reset_stats(self) -> None:
+        """Reset per-process guard telemetry; configuration serialization excludes it."""
+        self._stats = dict.fromkeys(
+            ("calls", "attempts", "accepted", "rejected", "reverted", "exceptions", "warnings"), 0
+        )
+        self._reasons: dict[str, int] = {}
+        self._last_reports = ()
+
+    @property
+    def stats(self) -> dict[str, Any]:
+        """Snapshot of attempts, failures, fallback rates, and rejection reasons."""
+        return {
+            **self._stats,
+            "reasons": dict(self._reasons),
+            "rejection_rate": self._stats["rejected"] / max(self._stats["attempts"], 1),
+            "revert_rate": self._stats["reverted"] / max(self._stats["calls"], 1),
+        }
+
+    @property
+    def last_reports(self) -> tuple[ValidationReport, ...]:
+        """Reports for the most recent applied call, including rejected attempts."""
+        return self._last_reports
 
     def _handle_failure(
         self, reference: MedVolume, candidate: MedVolume, report: ValidationReport
@@ -450,6 +575,7 @@ class Guard(Transform):
             warnings.warn(f"Guard validation failed:\n{report}", UserWarning, stacklevel=2)
             return candidate
         # "revert" and exhausted "retry" both fall back to the untouched input.
+        self._stats["reverted"] += 1
         if self.on_fail == "retry":
             warnings.warn(
                 f"Guard exhausted {self.retries} attempts; reverting to input.\n{report}",
@@ -468,6 +594,7 @@ class Guard(Transform):
                 "retries": self.retries,
                 "p": self.p,
                 "seed": self._seed,
+                "catch_errors": self.catch_errors,
             },
         }
 

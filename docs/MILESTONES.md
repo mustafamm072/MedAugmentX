@@ -89,9 +89,9 @@ training stacks while keeping the default install lightweight.
 | 3.12 | Keypoint & bounding-box targets warped through all spatial transforms | `medaugmentx/core/geometry.py`, `core/volume.py` | ✅ `0.9.0` |
 | 3.13 | Sphinx documentation site | `docs/sphinx/`, `.github/workflows/docs.yml` | ✅ `0.10.0` build; published to GitHub Pages (unreleased) |
 | 3.14 | Jupyter tutorials (MRI, CT, DBT) | `notebooks/`, `medaugmentx/phantoms.py` | ✅ unreleased |
-| 3.15 | v1.0 release + GitHub Actions CD pipeline | `.github/` | Planned |
-| 3.16 | Coherent patient-space affine, units, resampling, and DICOM geometry contracts | `core/`, `io/`, spatial transforms | Release blocker |
-| 3.17 | Actual framework-object integration CI and quantitative modality-model checks | `tests/`, `.github/` | Release blocker |
+| 3.15 | v1.0 release + GitHub Actions CD pipeline | `.github/` | Prepared for 1.0.0; publication requires maintainer setup |
+| 3.16 | Coherent patient-space affine, units, resampling, and DICOM geometry contracts | `core/`, `io/`, spatial transforms | Implemented in 1.0.0; see release evidence |
+| 3.17 | Actual framework-object integration CI and quantitative modality-model checks | `tests/`, `.github/` | Implemented in 1.0.0; see release evidence |
 
 ### Acceptance criteria (Phase 3 / v1.0)
 
@@ -107,9 +107,9 @@ training stacks while keeping the default install lightweight.
 - Optional integration jobs validate real framework objects and their geometry.
 - Preset intensity domains, voxel/mm units, laterality rules, and model
   assumptions are documented and supported by quantitative regression tests.
-- GPU speedup ≥ 5× vs CPU baseline for spatial transforms.
-- All transforms complete in < 500 ms on CPU for a 512×512×80 DBT volume.
-- CI/CD publishes wheels to PyPI on tag.
+- CPU benchmarks record measured latency/memory without universal timing claims.
+- Release workflow verifies tag/version and publishes only on a published release.
+- GPU acceleration is future work outside the v1 CPU API.
 
 ---
 
@@ -131,19 +131,9 @@ Contributors: see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## Current adoption priorities
 
-The current unreleased changes prioritize correctness and a small install:
-annotation alignment, saved seeds, isolated guard attempts, bounded config
-loading, DICOM spacing, searchable documentation, research guidance, and wheel
-verification. Existing GPU and vendor-specific goals remain future work;
-performance targets above are targets, not measured guarantees.
-
-Before a stable release: propagate NIfTI affines through crop/pad/resize and
-validate real TorchIO/MONAI tensor and patient-space affine behavior with optional integration environments, expand DICOM vendor
-fixtures, publish the documentation preview, and configure trusted publishing
-with the maintainer's PyPI project. Add measured benchmark comparisons before
-making speed or model-quality claims. GPU acceleration should remain optional.
-
-The [October 2026 project review](PROJECT_REVIEW.md) records reproduced defects
-and a proposed sequence: patient-space geometry and real integrations first,
-task/preset contracts next, then research provenance and performance. Passing
-unit tests or reaching a speed target does not waive the correctness gates.
+Version 1 implements the geometry, integration, policy, numerical-validation,
+QA and release-tooling work from the [October review](PROJECT_REVIEW.md).
+See [release readiness](RELEASE_READINESS.md) for measured evidence and remaining
+external checks. Real patient/site evaluation and vendor DICOM fixtures remain
+needed before task-specific clinical or scanner-compatibility claims. GPU
+acceleration remains optional future work, not a v1 promise.

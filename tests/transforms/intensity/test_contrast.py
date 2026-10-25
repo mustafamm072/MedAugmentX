@@ -41,7 +41,7 @@ def test_negative_gamma_rejected():
 
 @pytest.mark.parametrize("gamma", [0, -1, np.nan, np.inf, (np.nan, 1), (1, np.inf)])
 def test_invalid_scalar_or_range_gamma_rejected(gamma):
-    with pytest.raises(ValueError, match="finite, positive and ordered"):
+    with pytest.raises(ValueError, match="finite|positive|ordered"):
         GammaCorrection(gamma=gamma)
 
 

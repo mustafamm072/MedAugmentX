@@ -1,4 +1,5 @@
 """Unsharp-mask sharpening."""
+
 from __future__ import annotations
 
 from typing import Any, Union
@@ -7,6 +8,7 @@ import numpy as np
 from scipy.ndimage import gaussian_filter
 
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
 
@@ -43,6 +45,7 @@ class Sharpen(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
+        validate_parameters(alpha=alpha, sigma=sigma, clip=clip)
         self.alpha_range = _as_range(alpha, "alpha", min_value=0.0)
         self.sigma_range = _as_range(sigma, "sigma", min_value=0.0)
         if self.sigma_range[0] <= 0:
@@ -76,7 +79,7 @@ class Sharpen(Transform):
 
 
 def _as_range(x: Range, name: str, min_value: float) -> tuple[float, float]:
-    if isinstance(x, (int, float)):
+    if isinstance(x, (int, float, np.integer, np.floating)):
         v = float(x)
         if v < min_value:
             raise ValueError(f"{name} must be >= {min_value}, got {v}")

@@ -16,6 +16,7 @@ use them to draw conclusions about clinical performance.
     >>> volume = ct_phantom()
     >>> augmented = BeamHardening(alpha=0.10, seed=7)(volume)
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -62,7 +63,7 @@ def mri_phantom(size: int = DEFAULT_SIZE) -> MedVolume:
     brain = ellipse(y, x, 0, 0, 0.80, 0.65)
     inner = ellipse(y, x, 0, 0, 0.69, 0.54)
     image = 0.12 * head + 0.43 * brain + 0.18 * inner
-    folds = (np.sin(35 * x + 4 * np.cos(13 * y)) * np.sin(28 * y - 3 * x))
+    folds = np.sin(35 * x + 4 * np.cos(13 * y)) * np.sin(28 * y - 3 * x)
     image += 0.08 * folds * brain
     image[ellipse(y, x, -0.02, -0.12, 0.24, 0.07)] = 0.12
     image[ellipse(y, x, -0.02, 0.12, 0.24, 0.07)] = 0.12
@@ -102,11 +103,11 @@ def xray_phantom(size: int = DEFAULT_SIZE) -> MedVolume:
     image = 0.05 + 0.42 * body.astype(float)
     lungs = ellipse(y, x, -0.08, -0.31, 0.68, 0.25) | ellipse(y, x, -0.08, 0.31, 0.68, 0.25)
     image[lungs] = 0.15
-    image += 0.20 * np.exp(-(x / 0.085) ** 2) * body
+    image += 0.20 * np.exp(-((x / 0.085) ** 2)) * body
     image += 0.18 * ellipse(y, x, 0.24, 0.10, 0.32, 0.27)
     for height in np.linspace(-0.67, 0.52, 8):
         arc = height + 0.38 * x**2
-        image += 0.14 * np.exp(-((y - arc) / 0.018) ** 2) * body
+        image += 0.14 * np.exp(-(((y - arc) / 0.018) ** 2)) * body
     image += 0.035 * np.sin(21 * x + 9 * y) * lungs
     return MedVolume(gaussian_filter(image, 0.7).astype(np.float32), metadata={"modality": "DX"})
 
@@ -118,14 +119,17 @@ def dbt_phantom(seed: int = DEFAULT_SEED) -> MedVolume:
     thick-slice geometry that the DBT transforms are written for. `seed`
     controls lesion placement only; the background tissue is deterministic.
     """
-    z, y, x = np.meshgrid(np.linspace(-1, 1, 64), np.linspace(-1, 1, 128),
-                          np.linspace(-1, 1, 256), indexing="ij")
+    z, y, x = np.meshgrid(
+        np.linspace(-1, 1, 64), np.linspace(-1, 1, 128), np.linspace(-1, 1, 256), indexing="ij"
+    )
     tissue = (z / 0.80) ** 2 + (y / 1.15) ** 2 + ((x + 0.33) / 1.15) ** 2 < 1
     image = tissue * (0.16 + 0.035 * np.sin(15 * x + 9 * z) * np.cos(8 * y))
     rng = np.random.default_rng(seed)
     for _ in range(24):
         cz, cx = rng.uniform(-0.6, 0.6), rng.uniform(-0.9, 0.65)
         rz, rx = rng.uniform(0.025, 0.09), rng.uniform(0.025, 0.13)
-        blob = np.exp(-((z - cz) / rz) ** 2 - ((x - cx) / rx) ** 2 - (y / 0.35) ** 2)
+        blob = np.exp(-(((z - cz) / rz) ** 2) - ((x - cx) / rx) ** 2 - (y / 0.35) ** 2)
         image += rng.uniform(0.2, 0.6) * blob * tissue
-    return MedVolume(image.astype(np.float32), spacing=(1.0, 0.5, 0.25), metadata={"modality": "DBT"})
+    return MedVolume(
+        image.astype(np.float32), spacing=(1.0, 0.5, 0.25), metadata={"modality": "DBT"}
+    )

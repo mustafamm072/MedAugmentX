@@ -8,7 +8,7 @@ from medaugmentx.transforms import HistogramMatch
 
 @pytest.fixture
 def reference():
-    return (np.random.default_rng(1).random((30, 30)).astype(np.float32) * 5.0 + 10.0)
+    return np.random.default_rng(1).random((30, 30)).astype(np.float32) * 5.0 + 10.0
 
 
 @pytest.fixture

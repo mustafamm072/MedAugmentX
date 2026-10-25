@@ -8,6 +8,7 @@ Run with:
 
     python examples/dbt_pipeline.py
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -44,16 +45,19 @@ def synthesise_dbt_volume(seed: int = 0) -> MedVolume:
 
 def build_dbt_pipeline(seed: int = 0) -> Compose:
     """Manual pipeline — tune transforms and parameters for your dataset."""
-    return Compose([
-        RandomFlip(axes=("x",), p_per_axis=0.5),
-        RandomAffine(rotation=5.0, scale=(0.95, 1.05), axes_enabled=("z",), p=0.7),
-        AnisotropicElastic(alpha=(8.0, 100.0, 100.0), sigma=(2.0, 8.0, 8.0), p=0.4),
-        SlabShift(max_shift=2, p=0.5),
-        LimitedAngleBlur(arc_degrees=(15.0, 25.0), base_sigma=1.0, p=0.3),
-        SliceDropout(num_slices=(0, 2), p=0.2),
-        BiasField(alpha=0.2, coarse_shape=3, p=0.5),
-        GammaCorrection(gamma=(0.85, 1.15), p=0.4),
-    ], seed=seed)
+    return Compose(
+        [
+            RandomFlip(axes=("x",), p_per_axis=0.5),
+            RandomAffine(rotation=5.0, scale=(0.95, 1.05), axes_enabled=("z",), p=0.7),
+            AnisotropicElastic(alpha=(8.0, 100.0, 100.0), sigma=(2.0, 8.0, 8.0), p=0.4),
+            SlabShift(max_shift=2, p=0.5),
+            LimitedAngleBlur(arc_degrees=(15.0, 25.0), base_sigma=1.0, p=0.3),
+            SliceDropout(num_slices=(0, 2), p=0.2),
+            BiasField(alpha=0.2, coarse_shape=3, p=0.5),
+            GammaCorrection(gamma=(0.85, 1.15), p=0.4),
+        ],
+        seed=seed,
+    )
 
 
 def main() -> None:

@@ -103,11 +103,13 @@ finite, non-collapsed, labels intact — and can raise, warn, revert, or retry.
    api/index
    Public surface & semantics <../API_REFERENCE>
    Architecture <../ARCHITECTURE>
+   Model cards <../MODEL_CARDS>
 
 .. toctree::
    :caption: Guides
    :hidden:
 
+   Version 1 migration <../MIGRATION_V1>
    Research & reproducibility <../RESEARCH_GUIDE>
    Commercial adoption <../COMMERCIAL_ADOPTION>
    Benchmarks <../../benchmarks/README>
@@ -118,6 +120,7 @@ finite, non-collapsed, labels intact — and can raise, warn, revert, or retry.
 
    Roadmap <../MILESTONES>
    Project review <../PROJECT_REVIEW>
+   Release readiness <../RELEASE_READINESS>
    Contributing <../../CONTRIBUTING>
    Working on the docs <../README>
    Security policy <../../SECURITY>

@@ -69,7 +69,9 @@ def test_invalid_num_holes_raises():
 
 
 def test_to_dict_round_trip():
-    t = CoarseDropout(num_holes=(1, 4), hole_size=(0.05, 0.2), fill_value=0.0, fill_mask=True, p=0.5)
+    t = CoarseDropout(
+        num_holes=(1, 4), hole_size=(0.05, 0.2), fill_value=0.0, fill_mask=True, p=0.5
+    )
     d = t.to_dict()
     assert d["name"] == "CoarseDropout"
     t2 = CoarseDropout(**d["params"])

@@ -1,4 +1,5 @@
 """Small helpers shared across the library."""
+
 from __future__ import annotations
 
 from typing import Union
@@ -44,10 +45,12 @@ def normalize_axes(axes: int | tuple | list | None, ndim: int) -> tuple:
     """
     if axes is None:
         return tuple(range(ndim))
-    if isinstance(axes, int):
+    if isinstance(axes, (int, np.integer)):
         axes = (axes,)
     out: list[int] = []
     for a in axes:
+        if not isinstance(a, (int, np.integer)) or isinstance(a, (bool, np.bool_)):
+            raise ValueError("axes must contain integer indices")
         ax = int(a)
         if ax < 0:
             ax += ndim
@@ -80,7 +83,9 @@ def axis_label_to_index(label: str, ndim: int) -> int:
     return mapping[label]
 
 
-def clip_intensity(image: np.ndarray, lo: float | None = None, hi: float | None = None) -> np.ndarray:
+def clip_intensity(
+    image: np.ndarray, lo: float | None = None, hi: float | None = None
+) -> np.ndarray:
     """Clip in-place if writeable, otherwise return a clipped copy."""
     if lo is None and hi is None:
         return image

@@ -13,6 +13,7 @@ Available presets::
 
 All pipelines are serialisable via :mod:`medaugmentx.serialization`.
 """
+
 from __future__ import annotations
 
 from medaugmentx.core.compose import Compose, OneOf
@@ -23,7 +24,9 @@ from medaugmentx.core.utils import SeedLike
 # ---------------------------------------------------------------------------
 
 
-def mri_pipeline(seed: SeedLike = None) -> Compose:
+def mri_pipeline(
+    seed: SeedLike = None, *, allow_flip: bool = False, normalize: bool = False
+) -> Compose:
     """Standard MRI augmentation pipeline.
 
     Applies a representative mix of spatial deformations, intensity
@@ -39,10 +42,13 @@ def mri_pipeline(seed: SeedLike = None) -> Compose:
 
     Args:
         seed: Top-level RNG seed for reproducibility.
+        allow_flip: Opt in only when the dataset/task permits laterality reversal.
+        normalize: Prepend percentile normalization for arbitrary-unit inputs.
 
     Returns:
         A seeded :class:`~medaugmentx.core.compose.Compose` pipeline.
     """
+    from medaugmentx.transforms import NormalizeIntensity
     from medaugmentx.transforms.intensity.bias_field import BiasField
     from medaugmentx.transforms.intensity.contrast import GammaCorrection
     from medaugmentx.transforms.intensity.noise import RicianNoise
@@ -54,17 +60,20 @@ def mri_pipeline(seed: SeedLike = None) -> Compose:
     from medaugmentx.transforms.spatial.flip import RandomFlip
 
     return Compose(
-        [
-            RandomFlip(axes=("x",), p_per_axis=0.5, p=0.5),
+        ([NormalizeIntensity()] if normalize else [])
+        + [
+            RandomFlip(axes=("x",), p_per_axis=0.5, p=0.5 if allow_flip else 0.0),
             RandomAffine(rotation=10.0, scale=(0.9, 1.1), translation=(-0.05, 0.05), p=0.7),
             ElasticDeform(alpha=30.0, sigma=4.0, p=0.5),
             BiasField(alpha=0.3, p=0.7),
             RicianNoise(std=(0.005, 0.02), p=0.5),
             GammaCorrection(gamma=(0.85, 1.15), p=0.5),
             OneOf(
-                [GhostingArtifact(ghost_intensity=(0.05, 0.12), p=1.0),
-                 KSpaceDropout(dropout_fraction=(0.01, 0.04), p=1.0),
-                 MRIMotion(degrees=(1.0, 4.0), translation=(1.0, 3.0), p=1.0)],
+                [
+                    GhostingArtifact(ghost_intensity=(0.05, 0.12), p=1.0),
+                    KSpaceDropout(dropout_fraction=(0.01, 0.04), p=1.0),
+                    MRIMotion(degrees=(1.0, 4.0), translation=(1.0, 3.0), p=1.0),
+                ],
                 p=0.3,
             ),
         ],
@@ -77,7 +86,9 @@ def mri_pipeline(seed: SeedLike = None) -> Compose:
 # ---------------------------------------------------------------------------
 
 
-def ct_pipeline(seed: SeedLike = None) -> Compose:
+def ct_pipeline(
+    seed: SeedLike = None, *, allow_flip: bool = False, normalize_output: bool = False
+) -> Compose:
     """Standard CT augmentation pipeline.
 
     Combines spatial augmentations with CT-specific intensity transforms:
@@ -98,6 +109,8 @@ def ct_pipeline(seed: SeedLike = None) -> Compose:
 
     Args:
         seed: Top-level RNG seed for reproducibility.
+        allow_flip: Opt in only when the dataset/task permits laterality reversal.
+        normalize_output: Append deterministic window normalization after HU-domain effects.
 
     Returns:
         A seeded :class:`~medaugmentx.core.compose.Compose` pipeline.
@@ -113,16 +126,20 @@ def ct_pipeline(seed: SeedLike = None) -> Compose:
 
     return Compose(
         [
-            RandomFlip(axes=("x",), p_per_axis=0.5, p=0.5),
-            RandomAffine(rotation=8.0, scale=(0.9, 1.1), translation=(-0.03, 0.03), p=0.7),
-            ElasticDeform(alpha=20.0, sigma=4.0, p=0.4),
-            WindowLevel(center_shift_frac=0.05, width_scale=(0.85, 1.15),
-                        rescale_output=False, p=0.6),
+            RandomFlip(axes=("x",), p_per_axis=0.5, p=0.5 if allow_flip else 0.0),
+            RandomAffine(
+                rotation=8.0, scale=(0.9, 1.1), translation=(-0.03, 0.03), cval=-1000, p=0.7
+            ),
+            ElasticDeform(alpha=20.0, sigma=4.0, cval=-1000, mode="constant", p=0.4),
+            WindowLevel(
+                center_shift_frac=0.05, width_scale=(0.85, 1.15), rescale_output=False, p=0.6
+            ),
             GaussianNoise(std=(5.0, 20.0), p=0.4),
             GammaCorrection(gamma=(0.9, 1.1), p=0.4),
             BeamHardening(alpha=(0.02, 0.07), p=0.3),
             MetalStreak(intensity=(0.1, 0.25), p=0.15),
-        ],
+        ]
+        + ([WindowLevel(center_shift_frac=0, width_scale=1)] if normalize_output else []),
         seed=seed,
     )
 
@@ -132,7 +149,9 @@ def ct_pipeline(seed: SeedLike = None) -> Compose:
 # ---------------------------------------------------------------------------
 
 
-def dxr_pipeline(seed: SeedLike = None) -> Compose:
+def dxr_pipeline(
+    seed: SeedLike = None, *, allow_flip: bool = False, normalize: bool = False
+) -> Compose:
     """Augmentation pipeline for digital X-ray (chest X-ray / DXR).
 
     Applies 2-D-safe transforms only:
@@ -148,10 +167,13 @@ def dxr_pipeline(seed: SeedLike = None) -> Compose:
 
     Args:
         seed: Top-level RNG seed for reproducibility.
+        allow_flip: Opt in only when the dataset/task permits laterality reversal.
+        normalize: Prepend percentile normalization for arbitrary-unit inputs.
 
     Returns:
         A seeded :class:`~medaugmentx.core.compose.Compose` pipeline.
     """
+    from medaugmentx.transforms import NormalizeIntensity
     from medaugmentx.transforms.intensity.blur import GaussianBlur, SimulateLowResolution
     from medaugmentx.transforms.intensity.brightness_contrast import BrightnessContrast
     from medaugmentx.transforms.intensity.clahe import CLAHEContrast
@@ -162,8 +184,9 @@ def dxr_pipeline(seed: SeedLike = None) -> Compose:
     from medaugmentx.transforms.spatial.flip import RandomFlip
 
     return Compose(
-        [
-            RandomFlip(axes=("x",), p_per_axis=0.5, p=0.5),
+        ([NormalizeIntensity()] if normalize else [])
+        + [
+            RandomFlip(axes=("x",), p_per_axis=0.5, p=0.5 if allow_flip else 0.0),
             RandomAffine(
                 rotation=5.0,
                 scale=(0.95, 1.05),
@@ -176,8 +199,10 @@ def dxr_pipeline(seed: SeedLike = None) -> Compose:
             CLAHEContrast(clip_limit=(1.0, 2.5), p=0.3),
             SimulateLowResolution(zoom_range=(0.6, 0.95), p=0.3),
             OneOf(
-                [ScatterSimulation(fraction=(0.1, 0.3), p=1.0),
-                 GridArtifact(amplitude=(0.03, 0.08), p=1.0)],
+                [
+                    ScatterSimulation(fraction=(0.1, 0.3), p=1.0),
+                    GridArtifact(amplitude=(0.03, 0.08), p=1.0),
+                ],
                 p=0.25,
             ),
         ],
@@ -190,7 +215,9 @@ def dxr_pipeline(seed: SeedLike = None) -> Compose:
 # ---------------------------------------------------------------------------
 
 
-def dbt_pipeline(seed: SeedLike = None) -> Compose:
+def dbt_pipeline(
+    seed: SeedLike = None, *, allow_flip: bool = False, normalize: bool = False
+) -> Compose:
     """Augmentation pipeline for Digital Breast Tomosynthesis (DBT).
 
     DBT volumes are strongly anisotropic (thin slices, wide in-plane FOV).
@@ -210,10 +237,13 @@ def dbt_pipeline(seed: SeedLike = None) -> Compose:
 
     Args:
         seed: Top-level RNG seed for reproducibility.
+        allow_flip: Opt in only when the dataset/task permits laterality reversal.
+        normalize: Prepend percentile normalization for arbitrary-unit inputs.
 
     Returns:
         A seeded :class:`~medaugmentx.core.compose.Compose` pipeline.
     """
+    from medaugmentx.transforms import NormalizeIntensity
     from medaugmentx.transforms.intensity.bias_field import BiasField
     from medaugmentx.transforms.intensity.contrast import GammaCorrection
     from medaugmentx.transforms.modality.tomosynthesis.blur import LimitedAngleBlur
@@ -226,12 +256,14 @@ def dbt_pipeline(seed: SeedLike = None) -> Compose:
     from medaugmentx.transforms.spatial.flip import RandomFlip
 
     return Compose(
-        [
-            RandomFlip(axes=("x",), p_per_axis=0.5, p=0.5),
+        ([NormalizeIntensity()] if normalize else [])
+        + [
+            RandomFlip(axes=("x",), p_per_axis=0.5, p=0.5 if allow_flip else 0.0),
             RandomAffine(
                 rotation=5.0,
                 scale=(0.95, 1.05),
                 axes_enabled=("z",),
+                scale_axes=("y", "x"),
                 p=0.7,
             ),
             AnisotropicElastic(

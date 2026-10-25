@@ -1,5 +1,9 @@
 # Project review — 25 October 2026
 
+Historical review at `9bf04b1`. Implementation status and measured v1 evidence
+are now tracked in [release readiness](RELEASE_READINESS.md); the findings below
+retain their original wording for auditability.
+
 MedAugmentX has a useful foundation, but it is not ready for a stable medical
 imaging release. Its largest weakness is the gap between array-level correctness
 and patient-space correctness. Expanding the transform catalog or adding a GPU

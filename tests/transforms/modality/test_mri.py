@@ -1,4 +1,5 @@
 """Tests for MRI-specific transforms: GhostingArtifact, KSpaceDropout."""
+
 import numpy as np
 import pytest
 
@@ -23,6 +24,7 @@ def vol3d():
 
 
 # ---- GhostingArtifact ----
+
 
 def test_ghosting_changes_image_2d(vol2d):
     out = GhostingArtifact(ghost_intensity=0.1, ghost_shift=16, seed=0)(vol2d)
@@ -77,6 +79,7 @@ def test_ghosting_to_dict_round_trip():
 
 
 # ---- KSpaceDropout ----
+
 
 def test_kspace_changes_image_2d(vol2d):
     out = KSpaceDropout(dropout_fraction=0.05, seed=0)(vol2d)

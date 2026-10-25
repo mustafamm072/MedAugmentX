@@ -9,6 +9,7 @@ Run with:
 
     python examples/new_transforms.py
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -54,9 +55,13 @@ def main() -> None:
 
     print("\n--- Shape normalisation (resize -> pad/crop to a fixed batch shape) ---")
     target = (48, 224, 224)
-    normalise = Compose([Resize(size=(48, 200, 200)), Pad(size=target), CenterCrop(size=target)], seed=0)
+    normalise = Compose(
+        [Resize(size=(48, 200, 200)), Pad(size=target), CenterCrop(size=target)], seed=0
+    )
     out = normalise(vol)
-    print(f"  {vol.image.shape} -> {out.image.shape}  (mask labels preserved: {set(np.unique(out.mask).tolist())})")
+    print(
+        f"  {vol.image.shape} -> {out.image.shape}  (mask labels preserved: {set(np.unique(out.mask).tolist())})"
+    )
 
     # Intensity artifacts leave the mask untouched; CompressionVariation is a
     # spatial transform, so it warps the mask in lockstep with the image.

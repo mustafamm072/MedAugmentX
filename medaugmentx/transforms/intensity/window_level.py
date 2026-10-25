@@ -1,4 +1,5 @@
 """Window / level (center / width) perturbation for CT and other modalities."""
+
 from __future__ import annotations
 
 from typing import Any, Union
@@ -6,6 +7,7 @@ from typing import Any, Union
 import numpy as np
 
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
 
@@ -13,7 +15,7 @@ Range = Union[float, tuple[float, float]]
 
 
 def _as_range(x: Range, name: str) -> tuple[float, float]:
-    if isinstance(x, (int, float)):
+    if isinstance(x, (int, float, np.integer, np.floating)):
         v = float(x)
         return (-v, v)
     lo, hi = float(x[0]), float(x[1])
@@ -58,9 +60,14 @@ class WindowLevel(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
+        validate_parameters(
+            center_shift_frac=center_shift_frac,
+            width_scale=width_scale,
+            rescale_output=rescale_output,
+        )
         self.center_shift_range = _as_range(center_shift_frac, "center_shift_frac")
 
-        if isinstance(width_scale, (int, float)):
+        if isinstance(width_scale, (int, float, np.integer, np.floating)):
             v = float(width_scale)
             if v <= 0:
                 raise ValueError("width_scale must be > 0")
@@ -79,6 +86,8 @@ class WindowLevel(Transform):
         if "window_center" in volume.metadata and "window_width" in volume.metadata:
             center = float(volume.metadata["window_center"])
             width = float(volume.metadata["window_width"])
+            if not np.isfinite([center, width]).all() or width <= 0:
+                raise ValueError("Window metadata must be finite with positive width")
         else:
             lo = float(image.min())
             hi = float(image.max())
@@ -97,7 +106,15 @@ class WindowLevel(Transform):
         if self.rescale_output:
             out = (out - lo_clip) / (hi_clip - lo_clip)
 
-        return volume.replace(image=out.astype(np.float32, copy=False))
+        metadata = dict(volume.metadata)
+        metadata.update(
+            window_center=0.5 if self.rescale_output else new_center,
+            window_width=1.0 if self.rescale_output else new_width,
+            intensity_domain="normalized"
+            if self.rescale_output
+            else volume.metadata.get("intensity_domain", "native"),
+        )
+        return volume.replace(image=out.astype(np.float32, copy=False), metadata=metadata)
 
     def to_dict(self) -> dict[str, Any]:
         csr = self.center_shift_range

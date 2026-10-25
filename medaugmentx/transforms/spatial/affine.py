@@ -1,4 +1,5 @@
 """Random affine transform (rotation + scaling + translation), 2D and 3D."""
+
 from __future__ import annotations
 
 from typing import Any, Union
@@ -8,6 +9,7 @@ from scipy.ndimage import affine_transform
 
 from medaugmentx.core import geometry
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import checked_range, validate_parameters
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
 
@@ -15,7 +17,7 @@ Range = Union[float, tuple[float, float]]
 
 
 def _as_range(x: Range, default_centre: float = 0.0) -> tuple[float, float]:
-    if isinstance(x, (int, float)):
+    if isinstance(x, (int, float, np.integer, np.floating)):
         v = float(x)
         return (default_centre - v, default_centre + v)
     lo, hi = float(x[0]), float(x[1])
@@ -33,8 +35,9 @@ class RandomAffine(Transform):
 
     For in-plane-only rotation of a 3D volume, pass ``axes_enabled=("z",)``:
     rotation about the slice axis mixes only the row/column coordinates.
-    All geometry is in voxel coordinates; spacing does not convert rotations
-    to physical millimetres on anisotropic grids.
+    Rotations default to an orthonormal image frame using the physical grid
+    metric, preserving distances when scaling is one. Array axis names are
+    not anatomical RAS directions. Use space="voxel" for legacy index angles.
 
     Args:
         rotation: Maximum rotation in degrees. Either a scalar (interpreted
@@ -51,6 +54,10 @@ class RandomAffine(Transform):
         cval: Fill value for ``mode='constant'``.
         p: Probability of applying the transform.
         seed: RNG seed.
+        space: ``"physical"`` rotates rigidly in an orthonormal image frame
+            using the grid metric; ``"voxel"`` uses legacy index-space angles.
+        translation_units: ``"fraction"`` of axis size, ``"voxels"``, or ``"mm"``.
+        scale_axes: Array axis labels eligible for scaling; None means all.
     """
 
     _LABEL_TO_3D_AXIS = {"z": 0, "y": 1, "x": 2}
@@ -67,12 +74,37 @@ class RandomAffine(Transform):
         cval: float = 0.0,
         p: float = 1.0,
         seed: SeedLike = None,
+        space: str = "physical",
+        translation_units: str = "fraction",
+        scale_axes: tuple[str, ...] | None = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
+        validate_parameters(
+            rotation=rotation,
+            scale=scale,
+            translation=translation,
+            axes_enabled=axes_enabled,
+            order=order,
+            mode=mode,
+            cval=cval,
+        )
         self.rotation_range = _as_range(rotation)
-        self.scale_range = (float(scale[0]), float(scale[1]))
-        self.translation_range = (float(translation[0]), float(translation[1]))
+        self.scale_range = checked_range(scale, "scale", minimum=np.finfo(float).eps)
+        self.translation_range = checked_range(translation, "translation")
         self.axes_enabled = tuple(a.lower() for a in axes_enabled)
+        if set(self.axes_enabled) - {"x", "y", "z"}:
+            raise ValueError("axes_enabled must contain x, y, or z")
+        if space not in ("physical", "voxel") or translation_units not in (
+            "fraction",
+            "voxels",
+            "mm",
+        ):
+            raise ValueError("Invalid affine space or translation_units")
+        self.space = space
+        self.translation_units = translation_units
+        self.scale_axes = None if scale_axes is None else tuple(scale_axes)
+        if self.scale_axes is not None and set(self.scale_axes) - {"x", "y", "z"}:
+            raise ValueError("scale_axes must contain x, y, or z")
         if order not in (0, 1, 2, 3, 4, 5):
             raise ValueError("order must be in 0..5")
         self.order = int(order)
@@ -86,23 +118,17 @@ class RandomAffine(Transform):
         if ndim == 3:
             for label in ("z", "y", "x"):
                 if label in self.axes_enabled:
-                    params["rotations_deg"].append(
-                        float(self.rng.uniform(*self.rotation_range))
-                    )
+                    params["rotations_deg"].append(float(self.rng.uniform(*self.rotation_range)))
                 else:
                     params["rotations_deg"].append(0.0)
         else:  # 2D
             if "x" in self.axes_enabled or "y" in self.axes_enabled:
-                params["rotations_deg"].append(
-                    float(self.rng.uniform(*self.rotation_range))
-                )
+                params["rotations_deg"].append(float(self.rng.uniform(*self.rotation_range)))
             else:
                 params["rotations_deg"].append(0.0)
         for _ in range(ndim):
             params["scales"].append(float(self.rng.uniform(*self.scale_range)))
-            params["translations"].append(
-                float(self.rng.uniform(*self.translation_range))
-            )
+            params["translations"].append(float(self.rng.uniform(*self.translation_range)))
         return params
 
     @staticmethod
@@ -151,9 +177,28 @@ class RandomAffine(Transform):
 
     def apply(self, volume: MedVolume) -> MedVolume:
         params = self._sample_params(volume.ndim)
+        labels = ("z", "y", "x") if volume.is_3d else ("y", "x")
+        if self.scale_axes is not None:
+            params["scales"] = [
+                s if ax in self.scale_axes else 1.0 for s, ax in zip(params["scales"], labels)
+            ]
         matrix, offset, forward, centre, translation_px = self._build_matrix_offset(
             volume.ndim, params, volume.shape
         )
+        if self.space == "physical":
+            basis = (
+                np.diag(volume.spacing)
+                if volume.affine is None
+                else volume.affine[:3, : volume.ndim]
+            )
+            metric = np.linalg.cholesky(basis.T @ basis).T
+            forward = np.linalg.solve(metric, forward @ metric)
+        if self.translation_units == "voxels":
+            translation_px = np.asarray(params["translations"])
+        elif self.translation_units == "mm":
+            translation_px = np.asarray(params["translations"]) / volume.spacing
+        matrix = np.linalg.inv(forward)
+        offset = centre - matrix @ (centre + translation_px)
 
         image = as_float32(volume.image)
         new_image = affine_transform(
@@ -173,7 +218,7 @@ class RandomAffine(Transform):
                 matrix=matrix,
                 offset=offset,
                 order=0,
-                mode="constant",
+                mode=self.mode,
                 cval=0,
                 output_shape=volume.mask.shape,
                 prefilter=False,
@@ -194,5 +239,8 @@ class RandomAffine(Transform):
                 "cval": self.cval,
                 "p": self.p,
                 "seed": self._seed,
+                "space": self.space,
+                "translation_units": self.translation_units,
+                "scale_axes": self.scale_axes,
             },
         }

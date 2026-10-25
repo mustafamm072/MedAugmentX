@@ -68,7 +68,8 @@ Invariants enforced in `__post_init__`:
 - labels, when present, are 1D with one entry per target,
 - spacing length matches image ndim (defaults to all-1.0 if omitted),
 - spatial axes are non-empty; spacing is finite and positive; target coordinates are finite,
-- metadata is a dict.
+- metadata is a dict,
+- affine, when known, maps array indices to RAS mm and agrees with spacing.
 
 `replace()` returns a shallow copy with selected fields swapped (`None` means
 "keep current", so an intensity transform that only rewrites the image carries
@@ -165,8 +166,8 @@ image/mask alignment lives in `tests/integration/test_full_pipeline.py`.
 ### Anisotropic awareness
 
 DBT volumes can have `(1.0, 0.1, 0.1) mm` spacing — coarser sampling along Z
-than in-plane. Parameters are expressed in voxels and must be chosen to match
-the grid; these transforms do not automatically read spacing to set strength:
+than in-plane. Strength must match the task/grid. Affine angles use the physical metric;
+elastic and Gaussian blur parameters support explicit voxel/mm units:
 
 - `ElasticDeform(alpha=(10, 120, 120), sigma=(3, 10, 10))` — per-axis magnitude
 - `AnisotropicElastic` — thin wrapper with DBT defaults that fails fast on 2D input
@@ -177,7 +178,8 @@ the grid; these transforms do not automatically read spacing to set strength:
 Every displacement component uses the same spatial `sigma` tuple; `alpha`
 controls the component magnitudes. Landmark mapping solves the inverse pull
 field to a bounded residual and raises if it cannot converge. Nonlinear box
-mapping still uses only corners and may underestimate warped extents.
+mapping defaults to conservative global displacement bounds; optional corner
+mapping is an approximation.
 
 ### Serialisation contract
 
@@ -190,14 +192,15 @@ parameter names, or explicitly map them in `to_dict()`.
 
 ## 3. Serialisation (`medaugmentx/serialization.py`)
 
-Enables lossless round-trip persistence of any pipeline.
+Persists constructor policies with schema/library versions and a canonical hash.
+Current RNG checkpoints are stored separately by record_augmentation.
 
 ```
 pipeline  ──to_json()──►  JSON string  ──from_json()──►  pipeline
 pipeline  ──to_yaml()──►  YAML string  ──from_yaml()──►  pipeline  (requires PyYAML)
 ```
 
-**`REGISTRY`** maps class names to classes. All 36 built-in transforms are
+**`REGISTRY`** maps class names to classes. All built-in transforms and containers are
 registered at import time. Custom transforms can be added with the
 `@register_transform` decorator (validates the class and prevents accidental
 name collisions) or by direct assignment:

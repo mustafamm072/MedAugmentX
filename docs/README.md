@@ -3,6 +3,10 @@
 The published site is at **<https://mustafamm072.github.io/MedAugmentX/>**. This
 page is for people changing it.
 
+For a deterministic offline build, set `MEDAUGMENTX_DOCS_OFFLINE=1` before
+running Sphinx. CI uses this mode; it disables external intersphinx inventory
+fetches while retaining local API cross-references.
+
 ## How the site is put together
 
 Sphinx is invoked with the **repository root** as its source directory:

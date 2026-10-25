@@ -1,9 +1,13 @@
 """CoarseDropout — random rectangular/box occlusion (cutout)."""
+
 from __future__ import annotations
 
 from typing import Any, Union
 
+import numpy as np
+
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.utils import SeedLike
 from medaugmentx.core.volume import MedVolume
 
@@ -11,7 +15,7 @@ IntRange = Union[int, tuple[int, int]]
 
 
 def _as_int_range(x: IntRange, name: str) -> tuple[int, int]:
-    if isinstance(x, int):
+    if isinstance(x, (int, np.integer)):
         if x < 0:
             raise ValueError(f"{name} must be >= 0, got {x}")
         return (int(x), int(x))
@@ -56,6 +60,9 @@ class CoarseDropout(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
+        validate_parameters(
+            num_holes=num_holes, hole_size=hole_size, fill_value=fill_value, fill_mask=fill_mask
+        )
         self.num_range = _as_int_range(num_holes, "num_holes")
         lo, hi = float(hole_size[0]), float(hole_size[1])
         if not (0.0 < lo <= hi <= 1.0):

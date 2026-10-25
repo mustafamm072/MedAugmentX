@@ -1,4 +1,5 @@
 """Contrast Limited Adaptive Histogram Equalization (CLAHE)."""
+
 from __future__ import annotations
 
 from typing import Any, Union
@@ -6,6 +7,7 @@ from typing import Any, Union
 import numpy as np
 
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
 
@@ -51,7 +53,10 @@ def _clahe_2d(img01: np.ndarray, n_bins: int, gy: int, gx: int, clip_limit: floa
     wy = (fy - iy0)[:, None]
     wx = (fx - ix0)[None, :]
 
-    IY0, IX0 = iy0[:, None] + np.zeros_like(ix0)[None, :], ix0[None, :] + np.zeros_like(iy0)[:, None]
+    IY0, IX0 = (
+        iy0[:, None] + np.zeros_like(ix0)[None, :],
+        ix0[None, :] + np.zeros_like(iy0)[:, None],
+    )
     IY1 = iy1[:, None] + np.zeros_like(ix0)[None, :]
     IX1 = ix1[None, :] + np.zeros_like(iy0)[:, None]
 
@@ -97,7 +102,8 @@ class CLAHEContrast(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
-        if isinstance(clip_limit, (int, float)):
+        validate_parameters(clip_limit=clip_limit, grid=grid, n_bins=n_bins)
+        if isinstance(clip_limit, (int, float, np.integer, np.floating)):
             v = float(clip_limit)
             if v <= 0:
                 raise ValueError("clip_limit must be > 0")

@@ -1,4 +1,5 @@
 """Spatial blur and resolution-degradation transforms."""
+
 from __future__ import annotations
 
 from typing import Any, Union
@@ -7,6 +8,7 @@ import numpy as np
 from scipy.ndimage import gaussian_filter, median_filter, zoom
 
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
 
@@ -33,6 +35,7 @@ class GaussianBlur(Transform):
         mode: Boundary mode for :func:`scipy.ndimage.gaussian_filter`.
         p: Probability of applying.
         seed: RNG seed.
+        units: Sigma units, ``"voxels"`` or per-axis ``"mm"``.
     """
 
     def __init__(
@@ -42,9 +45,11 @@ class GaussianBlur(Transform):
         mode: str = "reflect",
         p: float = 1.0,
         seed: SeedLike = None,
+        units: str = "voxels",
     ) -> None:
         super().__init__(p=p, seed=seed)
-        if isinstance(sigma, (int, float)):
+        validate_parameters(sigma=sigma, order=order, mode=mode)
+        if isinstance(sigma, (int, float, np.integer, np.floating)):
             v = float(sigma)
             if v < 0:
                 raise ValueError("sigma must be >= 0")
@@ -58,13 +63,17 @@ class GaussianBlur(Transform):
             raise ValueError("order must be 0, 1, 2, or 3")
         self.order = int(order)
         self.mode = mode
+        if units not in ("voxels", "mm"):
+            raise ValueError("units must be voxels or mm")
+        self.units = units
 
     def apply(self, volume: MedVolume) -> MedVolume:
         image = as_float32(volume.image)
         sigma = float(self.rng.uniform(*self.sigma_range))
         if sigma == 0.0:
             return volume
-        blurred = gaussian_filter(image, sigma=sigma, order=self.order, mode=self.mode)
+        sigmas = sigma if self.units == "voxels" else tuple(sigma / s for s in volume.spacing)
+        blurred = gaussian_filter(image, sigma=sigmas, order=self.order, mode=self.mode)
         return volume.replace(image=blurred.astype(np.float32, copy=False))
 
     def to_dict(self) -> dict[str, Any]:
@@ -78,6 +87,7 @@ class GaussianBlur(Transform):
                 "mode": self.mode,
                 "p": self.p,
                 "seed": self._seed,
+                "units": self.units,
             },
         }
 
@@ -106,6 +116,8 @@ class SimulateLowResolution(Transform):
             (useful for anisotropic volumes).  Default False.
         p: Probability of applying.
         seed: RNG seed.
+        antialias: Smooth the image before downsampling; never filters masks.
+        clip_output: Clamp interpolation overshoot to the input range.
     """
 
     def __init__(
@@ -116,8 +128,13 @@ class SimulateLowResolution(Transform):
         per_axis: bool = False,
         p: float = 1.0,
         seed: SeedLike = None,
+        antialias: bool = True,
+        clip_output: bool = False,
     ) -> None:
         super().__init__(p=p, seed=seed)
+        validate_parameters(
+            zoom_range=zoom_range, order_down=order_down, order_up=order_up, per_axis=per_axis
+        )
         lo, hi = float(zoom_range[0]), float(zoom_range[1])
         if not (0 < lo <= hi <= 1.0):
             raise ValueError(f"zoom_range must satisfy 0 < lo <= hi <= 1, got {zoom_range}")
@@ -129,6 +146,8 @@ class SimulateLowResolution(Transform):
         self.order_down = int(order_down)
         self.order_up = int(order_up)
         self.per_axis = bool(per_axis)
+        self.antialias = bool(antialias)
+        self.clip_output = bool(clip_output)
 
     def apply(self, volume: MedVolume) -> MedVolume:
         image = as_float32(volume.image)
@@ -145,9 +164,16 @@ class SimulateLowResolution(Transform):
         # non-empty target dimensions before asking scipy to resample.
         small_shape = [max(1, round(s * f)) for s, f in zip(original_shape, factors)]
         down_factors = [t / s for t, s in zip(small_shape, original_shape)]
-        small = zoom(image, down_factors, order=self.order_down, mode="reflect")
+        filtered = (
+            gaussian_filter(image, sigma=[max(0.0, (1 / f - 1) / 2) for f in down_factors])
+            if self.antialias
+            else image
+        )
+        small = zoom(filtered, down_factors, order=self.order_down, mode="reflect", grid_mode=True)
         up_factors = [o / s for o, s in zip(original_shape, small.shape)]
-        large = zoom(small, up_factors, order=self.order_up, mode="reflect")
+        large = zoom(small, up_factors, order=self.order_up, mode="reflect", grid_mode=True)
+        if self.clip_output:
+            large = np.clip(large, image.min(), image.max())
 
         # Correct shape off-by-one from floating-point rounding
         slices = tuple(slice(0, s) for s in original_shape)
@@ -166,6 +192,8 @@ class SimulateLowResolution(Transform):
                 "order_down": self.order_down,
                 "order_up": self.order_up,
                 "per_axis": self.per_axis,
+                "antialias": self.antialias,
+                "clip_output": self.clip_output,
                 "p": self.p,
                 "seed": self._seed,
             },
@@ -203,7 +231,8 @@ class MedianBlur(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
-        if isinstance(ksize, int):
+        validate_parameters(ksize=ksize, mode=mode)
+        if isinstance(ksize, (int, np.integer)):
             lo = hi = int(ksize)
         else:
             lo, hi = int(ksize[0]), int(ksize[1])

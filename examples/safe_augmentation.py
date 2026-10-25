@@ -13,6 +13,7 @@ Run with:
 
     python examples/safe_augmentation.py
 """
+
 from __future__ import annotations
 
 import numpy as np

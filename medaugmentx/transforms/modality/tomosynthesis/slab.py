@@ -1,4 +1,5 @@
 """SlabShift — Z-axis recon-centre variation for DBT volumes."""
+
 from __future__ import annotations
 
 from typing import Any, Union
@@ -7,6 +8,7 @@ import numpy as np
 
 from medaugmentx.core import geometry
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.utils import SeedLike
 from medaugmentx.core.volume import MedVolume
 
@@ -40,7 +42,8 @@ class SlabShift(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
-        if isinstance(max_shift, int):
+        validate_parameters(max_shift=max_shift, cval=cval)
+        if isinstance(max_shift, (int, np.integer)):
             self.shift_range: tuple[int, int] = (-int(max_shift), int(max_shift))
         else:
             self.shift_range = (int(max_shift[0]), int(max_shift[1]))
@@ -56,11 +59,11 @@ class SlabShift(Transform):
         if shift > 0:
             n = max(0, depth - shift)
             if n > 0:
-                out[shift:shift + n] = arr[:n]
+                out[shift : shift + n] = arr[:n]
         else:
             n = max(0, depth + shift)  # shift is negative
             if n > 0:
-                out[:n] = arr[-shift:-shift + n]
+                out[:n] = arr[-shift : -shift + n]
         return out
 
     def apply(self, volume: MedVolume) -> MedVolume:
@@ -77,7 +80,8 @@ class SlabShift(Transform):
         )
         return volume.warp(
             geometry.translate_map(np.array([shift, 0.0, 0.0])),
-            image=new_image, mask=new_mask,
+            image=new_image,
+            mask=new_mask,
         )
 
     def to_dict(self) -> dict[str, Any]:

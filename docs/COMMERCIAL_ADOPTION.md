@@ -158,16 +158,15 @@ Keep `pipeline_config` with training metadata so any model run can be
 reconstructed later.
 
 
-## Remaining geometry limitations before a stable release
+## Geometry and supported integration scope
 
-Array-index target alignment does not establish patient-space registration.
-NIfTI source affines are retained in metadata; crop, pad, and resize operations
-do not yet propagate their complete grid changes into that affine. Exporting
-such results with `save_nifti` can therefore retain stale patient-space geometry.
-Use an explicitly validated export/grid conversion for those workflows.
+Version 1 propagates array-index-to-RAS-mm affine geometry through crop, pad,
+resize and NIfTI image/mask export. Synthetic tests include oblique/sheared grids,
+spatial units, world landmarks and actual MONAI/TorchIO objects. Active anatomy
+warps retain the sampling grid. See [migration contracts](MIGRATION_V1.md).
 
-The TorchIO adapter's current tests use lightweight stand-ins. Real TorchIO
-spatial-axis conventions and affine updates need dedicated integration coverage
-before claiming patient-space compatibility. This remains a v1.0 release
-blocker alongside vendor-specific DICOM coverage; the generic dictionary
-adapter's spacing update does not resolve those broader contracts.
+This support is deliberately bounded: classic monochrome single-frame DICOM,
+registered single-channel images/labels, explicit unsupported-object rejection,
+and no MONAI inverse-transform implementation. Vendor scanner fixtures and
+patient-cohort/model-benefit validation remain external work. Synthetic tests
+are not substitutes for those studies. Consult [release evidence](RELEASE_READINESS.md).

@@ -1,4 +1,5 @@
 """MRI phase-encoding ghosting artifact."""
+
 from __future__ import annotations
 
 from typing import Any, Union
@@ -6,6 +7,7 @@ from typing import Any, Union
 import numpy as np
 
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
 
@@ -47,7 +49,13 @@ class GhostingArtifact(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
-        if isinstance(ghost_intensity, (int, float)):
+        validate_parameters(
+            ghost_intensity=ghost_intensity,
+            ghost_shift=ghost_shift,
+            phase_encode_axis=phase_encode_axis,
+            num_ghosts=num_ghosts,
+        )
+        if isinstance(ghost_intensity, (int, float, np.integer, np.floating)):
             v = float(ghost_intensity)
             if v < 0:
                 raise ValueError("ghost_intensity must be >= 0")
@@ -58,7 +66,7 @@ class GhostingArtifact(Transform):
                 raise ValueError(f"ghost_intensity range invalid: {ghost_intensity}")
             self.ghost_intensity_range = (lo, hi)
 
-        if isinstance(ghost_shift, int):
+        if isinstance(ghost_shift, (int, np.integer)):
             self.ghost_shift_range: tuple[int, int] = (int(ghost_shift), int(ghost_shift))
         else:
             lo_i, hi_i = int(ghost_shift[0]), int(ghost_shift[1])
@@ -86,9 +94,7 @@ class GhostingArtifact(Transform):
         out = image.copy()
         for _ in range(self.num_ghosts):
             intensity = float(self.rng.uniform(*self.ghost_intensity_range))
-            shift = int(
-                self.rng.integers(self.ghost_shift_range[0], self.ghost_shift_range[1] + 1)
-            )
+            shift = int(self.rng.integers(self.ghost_shift_range[0], self.ghost_shift_range[1] + 1))
             if shift == 0:
                 continue
             direction = 1 if self.rng.random() < 0.5 else -1

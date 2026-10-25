@@ -10,6 +10,7 @@ Run with:
 
     python examples/custom_transform.py
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -47,10 +48,13 @@ def main() -> None:
     image = np.full((16, 16), 0.5, dtype=np.float32)
     vol = MedVolume(image=image)
 
-    pipeline = Compose([
-        IntensityShift(max_shift=0.1),
-        GaussianNoise(std=0.01),
-    ], seed=7)
+    pipeline = Compose(
+        [
+            IntensityShift(max_shift=0.1),
+            GaussianNoise(std=0.01),
+        ],
+        seed=7,
+    )
 
     out = pipeline(vol)
     print("Mean before:", float(vol.image.mean()))

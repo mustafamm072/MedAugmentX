@@ -23,6 +23,8 @@ concurrency:
 jobs:
   build:
     name: Build site
+    env:
+      MEDAUGMENTX_DOCS_OFFLINE: "1"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

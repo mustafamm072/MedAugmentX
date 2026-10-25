@@ -57,8 +57,9 @@ pipeline = Compose([
 out = pipeline(vol)
 ```
 
-`Compose(..., seed=42)` is bit-deterministic: the same seed yields the same
-output on every run, on every machine.
+Fresh equivalent `Compose(..., seed=42)` policies reproduce the draw sequence
+in the same software environment. Repeated calls advance RNG state; bitwise
+equality across machines/dependency versions is not guaranteed.
 
 ---
 
@@ -244,21 +245,18 @@ class MRIVolumes(Dataset):
         return self.augment(sample)
 ```
 
-For **reproducible epochs** (same augmentations every time epoch *N* runs),
-create a fresh seeded pipeline at the start of each epoch rather than reusing
-the same instance:
+For reproducibility independent of worker assignment, apply the policy to the
+loaded volume using a stable dataset ID and explicit epoch:
 
 ```python
-# In your training loop:
-for epoch in range(num_epochs):
-    dataset.augment = TorchTransform(mri_pipeline(seed=epoch), channel_dim=0)
-    # ... train ...
+from medaugmentx import apply_for_sample
+
+# Inside Dataset.__getitem__, before converting to model tensors:
+out = apply_for_sample(policy, vol, seed=42, sample_id=idx, epoch=self.epoch)
 ```
 
-A single `mri_pipeline(seed=42)` instance shared across all calls is
-**not** the right pattern for per-epoch reproducibility — its internal RNG
-advances with every sample, so the augmentations seen in epoch 2 depend on
-how many samples were drawn in epoch 1.
+Pass updated epoch state to workers explicitly. Parent-only mutations do not
+update persistent worker copies. See [seeding/replay contracts](MIGRATION_V1.md).
 
 ---
 
@@ -453,3 +451,17 @@ print(clean.num_keypoints, clean.num_bboxes)
 
 Only spatial transforms move targets — intensity and artifact transforms
 (and `CoarseDropout`) pass them through untouched.
+
+## Preview before training
+
+```python
+from medaugmentx import preview_augmentation
+from medaugmentx.presets import mri_pipeline
+from medaugmentx.io import load_nifti
+
+volume = load_nifti("image.nii.gz", mask_path="labels.nii.gz")
+report = preview_augmentation(mri_pipeline(normalize=True), volume, "preview.png")
+```
+
+Requires `medaugmentx[viz,io]`. Inspect labels, intensity range and Guard fallback
+rates; a clean structural report does not establish anatomical validity.

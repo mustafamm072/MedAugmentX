@@ -1,4 +1,5 @@
 """Pipeline builders: Compose, OneOf, SomeOf."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
@@ -30,9 +31,8 @@ class Compose(Transform):
         self.transforms: list[Transform] = list(transforms)
         for t in self.transforms:
             if not isinstance(t, Transform):
-                raise TypeError(
-                    f"Compose expected Transform instances, got {type(t).__name__}"
-                )
+                raise TypeError(f"Compose expected Transform instances, got {type(t).__name__}")
+        self._adopt_children(self.transforms)
         self._reseed_children()
 
     def _reseed_children(self) -> None:
@@ -43,6 +43,7 @@ class Compose(Transform):
 
     def set_rng(self, rng: np.random.Generator) -> None:
         super().set_rng(rng)
+        self._adopt_children(self.transforms)
         self._reseed_children()
 
     def apply(self, volume: MedVolume) -> MedVolume:
@@ -101,6 +102,7 @@ class OneOf(Transform):
             w = w / w.max()
             self.weights = w / w.sum()
 
+        self._adopt_children(self.transforms)
         self._reseed_children()
 
     def _reseed_children(self) -> None:
@@ -114,7 +116,7 @@ class OneOf(Transform):
     def apply(self, volume: MedVolume) -> MedVolume:
         idx = int(self.rng.choice(len(self.transforms), p=self.weights))
         # Force the chosen child to run regardless of its own ``p``.
-        return self.transforms[idx].apply(volume)
+        return self.transforms[idx]._run(volume, force=True)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -150,7 +152,10 @@ class SomeOf(Transform):
             if not isinstance(t, Transform):
                 raise TypeError(f"SomeOf expected Transform, got {type(t).__name__}")
 
-        if isinstance(n, int):
+        from medaugmentx.core.parameters import validate_parameters
+
+        validate_parameters(num_holes=n)
+        if isinstance(n, (int, np.integer)):
             lo, hi = n, n
         else:
             lo, hi = int(n[0]), int(n[1])
@@ -158,6 +163,7 @@ class SomeOf(Transform):
             raise ValueError(f"n={n} invalid for {len(self.transforms)} transforms")
         self.n_range: tuple[int, int] = (lo, hi)
 
+        self._adopt_children(self.transforms)
         self._reseed_children()
 
     def _reseed_children(self) -> None:
@@ -177,7 +183,7 @@ class SomeOf(Transform):
         idxs.sort()
         out = volume
         for i in idxs:
-            out = self.transforms[int(i)].apply(out)
+            out = self.transforms[int(i)]._run(out, force=True)
         return out
 
     def to_dict(self) -> dict[str, Any]:

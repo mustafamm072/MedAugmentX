@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "medaugmentx"
-version = "0.10.0"
+dynamic = ["version"]
 description = "Clinically-aware medical image augmentation for AI training (MRI, CT, X-Ray, Tomosynthesis)."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -24,7 +24,7 @@ keywords = [
     "radiology-ai",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Intended Audience :: Healthcare Industry",
     "Intended Audience :: Science/Research",
@@ -60,6 +60,7 @@ test = [
     "pydicom>=2.3",
     "nibabel>=4.0",
 ]
+viz = ["matplotlib>=3.5"]
 yaml = ["pyyaml>=6.0"]
 torch = ["torch>=2.0"]
 monai = ["monai>=1.3"]
@@ -90,7 +91,10 @@ include = ["medaugmentx*"]
 exclude = ["tests*", "examples*", "docs*"]
 
 [tool.setuptools.package-data]
-medaugmentx = ["py.typed"]
+medaugmentx = ["py.typed", "resources/*.json"]
+
+[tool.setuptools.dynamic]
+version = {attr = "medaugmentx._version.__version__"}
 
 [tool.pytest.ini_options]
 minversion = "7.0"
@@ -99,6 +103,7 @@ addopts = "-ra -q --strict-markers"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "io: marks tests that require optional I/O dependencies",
+    "frameworks: tests with actual optional PyTorch/MONAI/TorchIO objects",
 ]
 
 [tool.ruff]
@@ -113,6 +118,7 @@ ignore = ["E501"]
 # Tests gate optional-dependency imports behind pytest.importorskip,
 # which forces module-level imports to follow a statement.
 "tests/io/*.py" = ["E402"]
+"tests/interop/test_real_frameworks.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.12"

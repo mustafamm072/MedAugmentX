@@ -1,4 +1,5 @@
 """CT metal streak artifact simulation."""
+
 from __future__ import annotations
 
 from typing import Any, Union
@@ -6,6 +7,7 @@ from typing import Any, Union
 import numpy as np
 
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
 
@@ -48,7 +50,10 @@ class MetalStreak(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
-        if isinstance(intensity, (int, float)):
+        validate_parameters(
+            intensity=intensity, num_streaks=num_streaks, num_sources=num_sources, falloff=falloff
+        )
+        if isinstance(intensity, (int, float, np.integer, np.floating)):
             v = float(intensity)
             if v < 0:
                 raise ValueError("intensity must be >= 0")
@@ -116,7 +121,7 @@ class MetalStreak(Transform):
 
 
 def _as_int_range(x: IntRange, name: str, min_value: int) -> tuple[int, int]:
-    if isinstance(x, int):
+    if isinstance(x, (int, np.integer)):
         if x < min_value:
             raise ValueError(f"{name} must be >= {min_value}, got {x}")
         return (int(x), int(x))

@@ -1,11 +1,14 @@
 """LimitedAngleBlur — anisotropic Z-only blur for DBT volumes."""
+
 from __future__ import annotations
 
 from typing import Any, Union
 
+import numpy as np
 from scipy.ndimage import gaussian_filter1d
 
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
 
@@ -50,7 +53,10 @@ class LimitedAngleBlur(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
-        if isinstance(arc_degrees, (int, float)):
+        validate_parameters(
+            arc_degrees=arc_degrees, base_sigma=base_sigma, reference_arc_deg=reference_arc_deg
+        )
+        if isinstance(arc_degrees, (int, float, np.integer, np.floating)):
             self.arc_range: tuple[float, float] = (float(arc_degrees), float(arc_degrees))
         else:
             self.arc_range = (float(arc_degrees[0]), float(arc_degrees[1]))

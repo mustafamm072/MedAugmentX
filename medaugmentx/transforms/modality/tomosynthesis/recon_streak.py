@@ -1,4 +1,5 @@
 """ReconStreak — DBT out-of-plane reconstruction streak artifact."""
+
 from __future__ import annotations
 
 from typing import Any, Union
@@ -7,6 +8,7 @@ import numpy as np
 from scipy.ndimage import shift as nd_shift
 
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
 
@@ -55,7 +57,14 @@ class ReconStreak(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
-        if isinstance(amplitude, (int, float)):
+        validate_parameters(
+            amplitude=amplitude,
+            num_planes=num_planes,
+            displacement=displacement,
+            decay=decay,
+            axis=axis,
+        )
+        if isinstance(amplitude, (int, float, np.integer, np.floating)):
             v = float(amplitude)
             if v < 0:
                 raise ValueError("amplitude must be >= 0")
@@ -66,7 +75,7 @@ class ReconStreak(Transform):
                 raise ValueError(f"amplitude range invalid: {amplitude}")
             self.amplitude_range = (lo, hi)
 
-        if isinstance(num_planes, int):
+        if isinstance(num_planes, (int, np.integer)):
             plo = phi = int(num_planes)
         else:
             plo, phi = int(num_planes[0]), int(num_planes[1])

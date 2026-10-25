@@ -1,4 +1,5 @@
 """Smoke tests for pre-built modality pipelines."""
+
 import numpy as np
 import pytest
 
@@ -30,9 +31,7 @@ def dbt_vol():
     img = rng.random((20, 64, 64)).astype(np.float32)
     mask = np.zeros_like(img, dtype=np.uint8)
     mask[5:15, 20:40, 20:40] = 1
-    return MedVolume(
-        image=img, mask=mask, spacing=(1.0, 0.1, 0.1), metadata={"modality": "DBT"}
-    )
+    return MedVolume(image=img, mask=mask, spacing=(1.0, 0.1, 0.1), metadata={"modality": "DBT"})
 
 
 # ---------------------------------------------------------------------------

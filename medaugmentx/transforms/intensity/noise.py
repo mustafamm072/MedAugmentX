@@ -1,4 +1,5 @@
 """Noise models: additive Gaussian and MRI-style Rician."""
+
 from __future__ import annotations
 
 from typing import Any, Union
@@ -6,6 +7,7 @@ from typing import Any, Union
 import numpy as np
 
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
 
@@ -13,7 +15,7 @@ Range = Union[float, tuple[float, float]]
 
 
 def _as_std_range(x: Range) -> tuple[float, float]:
-    if isinstance(x, (int, float)):
+    if isinstance(x, (int, float, np.integer, np.floating)):
         v = float(x)
         if v < 0:
             raise ValueError(f"std must be >= 0, got {v}")
@@ -49,6 +51,7 @@ class GaussianNoise(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
+        validate_parameters(std=std, relative=relative, clip=clip)
         self.std_range = _as_std_range(std)
         self.relative = bool(relative)
         self.clip = clip
@@ -110,6 +113,7 @@ class RicianNoise(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
+        validate_parameters(std=std, clip=clip)
         self.std_range = _as_std_range(std)
         self.clip = clip
 
@@ -118,7 +122,7 @@ class RicianNoise(Transform):
         std = float(self.rng.uniform(*self.std_range))
         real = image + self.rng.normal(0.0, std, size=image.shape).astype(np.float32)
         imag = self.rng.normal(0.0, std, size=image.shape).astype(np.float32)
-        out = np.sqrt(real * real + imag * imag).astype(np.float32)
+        out = np.hypot(real, imag).astype(np.float32)
         if self.clip is not None:
             out = np.clip(out, self.clip[0], self.clip[1])
         return volume.replace(image=out)

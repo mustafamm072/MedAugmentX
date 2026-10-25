@@ -1,9 +1,13 @@
 """SliceDropout — randomly zero a small number of slices."""
+
 from __future__ import annotations
 
 from typing import Any, Union
 
+import numpy as np
+
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.utils import SeedLike
 from medaugmentx.core.volume import MedVolume
 
@@ -38,7 +42,8 @@ class SliceDropout(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
-        if isinstance(num_slices, int):
+        validate_parameters(num_slices=num_slices, cval=cval, affect_mask=affect_mask)
+        if isinstance(num_slices, (int, np.integer)):
             self.num_range: tuple[int, int] = (int(num_slices), int(num_slices))
         else:
             self.num_range = (int(num_slices[0]), int(num_slices[1]))

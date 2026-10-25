@@ -49,3 +49,10 @@ MRI, CT, and X-ray use 2D inputs. Tomosynthesis uses a 3D phantom with spacing
 `(1.0, 0.5, 0.25)` and displays its middle-y `(z, x)` plane in physical aspect
 ratio. The display range is fixed within each row, and each transform receives
 the original input independently.
+
+## Preview and exact replay
+
+Install `medaugmentx[viz]`, then run `python examples/preview_and_replay.py --output preview-output`.
+This writes a synthetic image/mask montage, structural QA, versioned policy and
+verified replay record. For real NIfTI use `load_nifti(image_path, mask_path=mask_path)`
+and keep output artifacts inside your controlled data store.

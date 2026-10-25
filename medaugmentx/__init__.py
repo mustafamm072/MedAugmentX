@@ -1,7 +1,10 @@
 """MedAugmentX — clinically-aware medical image augmentation.
 
-Public surface for Phase 3.
+Public API for version 1.
 """
+
+from medaugmentx._version import __version__
+from medaugmentx.cards import list_model_cards, model_card
 from medaugmentx.core import (
     Compose,
     MedVolume,
@@ -10,6 +13,13 @@ from medaugmentx.core import (
     Transform,
 )
 from medaugmentx.inspection import PipelineStep, iter_pipeline, pipeline_summary
+from medaugmentx.qa import preview_augmentation, volume_summary
+from medaugmentx.reproducibility import (
+    apply_for_sample,
+    record_augmentation,
+    replay_augmentation,
+    seed_for_sample,
+)
 from medaugmentx.validation import (
     Guard,
     ValidationError,
@@ -18,10 +28,16 @@ from medaugmentx.validation import (
     VolumeValidator,
 )
 
-__version__ = "0.10.0"
-
 __all__ = [
     "__version__",
+    "model_card",
+    "list_model_cards",
+    "preview_augmentation",
+    "volume_summary",
+    "apply_for_sample",
+    "seed_for_sample",
+    "record_augmentation",
+    "replay_augmentation",
     "MedVolume",
     "Transform",
     "Compose",

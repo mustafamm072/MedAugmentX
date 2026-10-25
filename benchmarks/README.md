@@ -1,48 +1,56 @@
-# Benchmarks
+# Benchmarks and evaluation
 
-A lightweight, dependency-free speed benchmark for MedAugmentX transforms.
-It times every registered leaf transform on a synthetic volume and prints a
-table sorted by wall-clock time.
+Run from an installed checkout:
 
 ```bash
-# Typical training patch size (default)
-python benchmarks/benchmark.py
-
-# Phase-3 acceptance-target size (512x512x80 DBT volume)
-python benchmarks/benchmark.py --shape 80 512 512
-
-# More repeats / a 2-D volume
-python benchmarks/benchmark.py --shape 512 512 --repeats 5
+python benchmarks/benchmark.py --shape 32 128 128 --repeats 10 --threads 1 --json benchmark.json
+python benchmarks/benchmark.py --shape 80 512 512 --repeats 5 --json full-volume.json
 ```
 
-## Interpreting the results
+Each transform runs in a fresh process. The script sets common BLAS/OpenMP thread
+environment variables before the child imports NumPy, warms up once, and records
+all wall-clock samples, median and p95. Short runs have noisy p95 estimates.
+JSON records library/Python/NumPy/SciPy versions, platform, CPU description,
+logical CPU count, thread environment, NumPy build configuration, input and mask
+dtypes, shapes, seed and complete constructor policy. Containers are excluded;
+histogram matching uses a fixed quantile reference. 3D-only effects skip 2D input.
 
-- Times are **best-of-N** wall-clock per `__call__`, in milliseconds, on a
-  CPU using the current BLAS/SciPy threading configuration. Threads are not
-  pinned by this script.
-- Container transforms (`Compose`, `OneOf`, `SomeOf`, `Guard`) and `HistogramMatch`
-  (which needs a reference array) are skipped.
-- 3-D-only transforms (`SlabShift`, `ReconStreak`, …) are skipped for 2-D
-  shapes.
+Memory is measured in an extra draw to avoid tracing overhead in timings.
+`tracked_peak_bytes` is tracemalloc's observed allocation peak, which may miss
+native allocations. `process_peak_rss_bytes` is process lifetime peak RSS,
+including interpreter/imports/input/warm-up/timing; it is not an incremental
+transform cost and is unavailable on Windows. Compare identical environments
+and settings. Small shapes do not establish full-resolution performance.
 
-## On the 500 ms CPU target
+`resources/validation/benchmark-small-3d.json` and `benchmark-patch-3d.json`
+(32×128×128) are measured smoke/patch benchmarks,
+not a performance guarantee or comparison against other libraries. There is no
+universal 500 ms claim and no GPU backend in v1. Budget using your own volumes,
+annotation load and policy. Avoid large 3D median kernels or unnecessary full
+volume augmentation when patch-based training suffices.
 
-The Phase-3 / v1.0 acceptance criterion is *"all transforms complete in
-< 500 ms on CPU for a 512×512×80 DBT volume."* On a full-resolution
-21-megavoxel volume this is **not yet met on CPU** — and not only by the new
-transforms: several Phase-1/2 transforms (`ElasticDeform`, `BiasField`,
-`AnisotropicElastic`, `RandomAffine`, `SimulateLowResolution`) also exceed it.
-Closing that gap is the job of the planned **PyTorch GPU backend**
-(roadmap item 3.4), which targets a ≥ 5× speedup for spatial transforms.
+## Controlled synthetic segmentation comparison
 
-At typical training patch sizes (e.g. `64×256×256`) the large majority of
-transforms run in well under 50 ms. The intrinsically expensive ones are
-3-D `MedianBlur` (a cubic-window rank filter) and large-sigma Gaussian
-operations (`ScatterSimulation`, `BiasField`); budget accordingly or run them
-at lower probability.
+```bash
+pip install 'medaugmentx[torch]'
+python benchmarks/segmentation_experiment.py --json experiment.json --epochs 12 --seeds 0 1 2
+```
 
-Shape helpers derive output sizes from the input: crops use half each axis,
-resize uses 0.625 times each axis, and padding uses 1.5 times each axis (rounded,
-with at least one voxel). Record these settings and dependency versions when
-comparing benchmark runs. Small-patch timings do not establish the full-volume
-target or a speed advantage over other libraries.
+The script uses fixed disjoint synthetic ellipse-image splits, a small CPU CNN,
+identical training settings, no augmentation/spatial/appearance ablations and
+three initialization seeds. The held-out split has an intensity/noise shift.
+JSON contains policies, environments, per-image Dice and training runtime.
+No policy or threshold is selected using the held-out split.
+
+The checked-in run produced mean Dice **0.9091** without augmentation,
+**0.9062** with spatial augmentation and **0.8596** with the tested appearance
+policy (seed standard deviations 0.0096, 0.0162, 0.0022). Appearance augmentation
+hurt this task. This small synthetic comparison demonstrates an evaluation
+workflow and does not establish medical dataset benefit. It is not evidence to
+recommend one preset for clinical data. The raw run is in
+`resources/validation/synthetic-segmentation.json`.
+
+For a deployment decision, repeat a preregistered ablation on patient-separated
+training/validation/test cohorts, keep evaluation preprocessing fixed, assess
+rare classes and scanner/site shifts, and report uncertainty and Guard fallback
+rates. Real scanner/cohort evaluation has not been performed in this repository.

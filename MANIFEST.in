@@ -11,3 +11,5 @@ recursive-include notebooks *.md *.py *.ipynb
 recursive-include benchmarks *.md *.py
 recursive-include tests *.py
 global-exclude __pycache__ *.py[cod] .DS_Store
+
+recursive-include resources *.json *.md

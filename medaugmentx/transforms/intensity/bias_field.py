@@ -1,4 +1,5 @@
 """Multiplicative bias field — MRI intensity non-uniformity simulation."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -7,6 +8,7 @@ import numpy as np
 from scipy.ndimage import zoom
 
 from medaugmentx.core.base import Transform
+from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
 
@@ -47,6 +49,7 @@ class BiasField(Transform):
         seed: SeedLike = None,
     ) -> None:
         super().__init__(p=p, seed=seed)
+        validate_parameters(alpha=alpha, coarse_shape=coarse_shape, order=order)
         self.alpha = float(alpha)
         if self.alpha < 0:
             raise ValueError(f"alpha must be >= 0, got {alpha}")
@@ -60,26 +63,22 @@ class BiasField(Transform):
         shape = image.shape
         ndim = len(shape)
 
-        if isinstance(self.coarse_shape, int):
+        if isinstance(self.coarse_shape, (int, np.integer)):
             coarse: tuple[int, ...] = tuple(self.coarse_shape for _ in range(ndim))
         else:
             coarse = tuple(int(c) for c in self.coarse_shape)
             if len(coarse) != ndim:
-                raise ValueError(
-                    f"coarse_shape has {len(coarse)} dims but volume has {ndim}"
-                )
+                raise ValueError(f"coarse_shape has {len(coarse)} dims but volume has {ndim}")
 
         if self.alpha == 0.0:
             return volume
 
-        log_field_coarse = self.rng.uniform(
-            -self.alpha, self.alpha, size=coarse
-        ).astype(np.float32)
+        log_field_coarse = self.rng.uniform(-self.alpha, self.alpha, size=coarse).astype(np.float32)
 
         zoom_factors = tuple(s / c for s, c in zip(shape, coarse))
-        log_field = zoom(
-            log_field_coarse, zoom_factors, order=self.order, mode="nearest"
-        ).astype(np.float32)
+        log_field = zoom(log_field_coarse, zoom_factors, order=self.order, mode="nearest").astype(
+            np.float32
+        )
 
         # Trim to exact shape (zoom may overshoot by 1 voxel due to rounding)
         slices = tuple(slice(0, s) for s in shape)
@@ -88,6 +87,7 @@ class BiasField(Transform):
             pad = [(0, max(0, s - f)) for s, f in zip(shape, log_field.shape)]
             log_field = np.pad(log_field, pad, mode="edge")[slices]
 
+        log_field = np.clip(log_field, -self.alpha, self.alpha)
         out = (image * np.exp(log_field)).astype(np.float32)
         return volume.replace(image=out)
 
@@ -98,7 +98,7 @@ class BiasField(Transform):
                 "alpha": self.alpha,
                 "coarse_shape": (
                     self.coarse_shape
-                    if isinstance(self.coarse_shape, int)
+                    if isinstance(self.coarse_shape, (int, np.integer))
                     else list(self.coarse_shape)
                 ),
                 "order": self.order,

@@ -16,7 +16,7 @@ generated from the source, so they always match the version you have installed:
 ## What is public
 
 Prefer these import paths in applications, papers, tutorials, and commercial
-code. Internal module paths may move before `1.0` without a deprecation cycle.
+code. Version 1 follows semantic versioning for these public imports. Internal module paths may change.
 
 ```python
 from medaugmentx import (                # core data model and pipelines
@@ -60,7 +60,7 @@ Boxes are `(M, 2*ndim)`, laid out low corner first: `[min_axis0, …, max_axis0,
 | `ElasticDeform`, `AnisotropicElastic` | Iteratively invert the pixel pull field at each point; raise if inversion does not converge |
 | `AnatomicCrop`, `CenterCrop` | Shift by the crop origin (may go negative) |
 | `Pad` | Shift by the pad width |
-| `Resize` | Align voxel centres using `(new_size - 1) / (old_size - 1)`; singleton axes map to zero |
+| `Resize` | Preserve voxel extent: `(p + 0.5) * new_size / old_size - 0.5`, including singleton axes |
 | `SlabShift` | Translate along the slice axis |
 | `CompressionVariation` | Scale about the volume centre on the compression axis |
 | `CoarseDropout`, all intensity and artifact transforms | Unchanged (pass through) |
@@ -69,9 +69,9 @@ The catalog's *Targets* column is generated from the code. Delegating wrappers
 also map targets, even when their own module does not import geometry helpers.
 
 **Boxes under rotation.** A box is mapped through its `2**ndim` corners and
-re-bounded to an axis-aligned box, so it stays valid but may grow. For
-non-linear displacement fields this is an approximation: the result is not
-guaranteed to enclose every warped interior point.
+re-bounded to an axis-aligned box, so it stays valid but may grow. Elastic transforms default to conservative global displacement bounds that
+enclose interior points but can be loose. Corner-only nonlinear boxes remain an
+explicit approximation option.
 
 **Targets that leave the frame.** Transforms map targets faithfully and never
 drop them, because only the caller knows whether a partly-visible object should
@@ -150,9 +150,9 @@ MedAugmentX operates on single-channel 2D and 3D data. `channel_dim` — `None`,
 should expect a singleton channel dimension; it is stripped before augmentation
 and restored afterwards.
 
-For a TorchIO `Subject`, explicit `image_key` and `label_key` are used when
-present; otherwise the adapter infers a unique non-label image key and a unique
-label-like key. Pass explicit keys for multi-image subjects.
+TorchIO adapters require their configured image and optional label keys.
+Additional images are rejected because they would not receive the sampled warp.
+Native XYZ axes and current affines are converted explicitly.
 
 Importing an adapter never imports its framework. Torch, MONAI, and TorchIO are
 touched only when a sample of that kind actually passes through.
@@ -168,6 +168,7 @@ The core install is NumPy and SciPy only. Everything else is opt-in:
 | `dicom` | `pydicom` | `load_dicom_series` |
 | `nifti` | `nibabel` | `load_nifti`, `save_nifti` |
 | `io` | `pydicom`, `nibabel` | Both readers |
+| `viz` | `matplotlib` | Local image/mask QA montage |
 | `yaml` | `pyyaml` | `to_yaml`, `from_yaml` |
 | `torch` | `torch` | `TorchTransform` with tensors |
 | `monai` | `monai` | MONAI dictionary pipelines |
@@ -186,3 +187,11 @@ The core install is NumPy and SciPy only. Everything else is opt-in:
 | [Architecture](ARCHITECTURE.md) | Layering, contracts, dependency boundaries, testing strategy |
 | [Research guide](RESEARCH_GUIDE.md) | Replay, worker seeds, evaluation reporting, citation |
 | [Security policy](../SECURITY.md) | Vulnerability reporting, PHI handling, dependency posture |
+
+## Version 1 geometry, seeding and inspection
+
+See [migration contracts](MIGRATION_V1.md) for the authoritative affine convention,
+NIfTI/DICOM support, preset domains and framework limitations. Public helpers
+`apply_for_sample`, `seed_for_sample`, `record_augmentation`, `replay_augmentation`,
+`preview_augmentation`, `volume_summary`, `model_card` and `list_model_cards`
+are available from `medaugmentx`. Preview requires the `viz` extra.

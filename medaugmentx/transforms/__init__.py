@@ -1,4 +1,5 @@
 """All MedAugmentX transforms re-exported as a flat namespace."""
+
 # Spatial
 # Intensity
 from medaugmentx.transforms.intensity.bias_field import BiasField
@@ -8,6 +9,7 @@ from medaugmentx.transforms.intensity.clahe import CLAHEContrast
 from medaugmentx.transforms.intensity.contrast import GammaCorrection
 from medaugmentx.transforms.intensity.histogram import HistogramMatch
 from medaugmentx.transforms.intensity.noise import GaussianNoise, RicianNoise
+from medaugmentx.transforms.intensity.normalize import NormalizeIntensity
 from medaugmentx.transforms.intensity.sharpen import Sharpen
 from medaugmentx.transforms.intensity.window_level import WindowLevel
 
@@ -59,6 +61,7 @@ __all__ = [
     "Sharpen",
     "CLAHEContrast",
     "HistogramMatch",
+    "NormalizeIntensity",
     # Tomosynthesis (DBT)
     "SlabShift",
     "LimitedAngleBlur",

@@ -1,4 +1,5 @@
 """Tests for CT-specific transforms: BeamHardening."""
+
 import numpy as np
 import pytest
 

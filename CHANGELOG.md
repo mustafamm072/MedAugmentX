@@ -5,7 +5,37 @@ All notable changes to MedAugmentX will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.0.0] — prepared 2026-10-25
+
+### Changed
+
+- Establish array-index-to-RAS-mm affine geometry, coherent crop/pad/resize and
+  NIfTI image/mask export with spatial-unit conversion and shear preservation.
+- Resize now uses voxel-extent coordinates and anti-aliasing. Affine rotation
+  defaults to the physical metric. See `docs/MIGRATION_V1.md` for breaking changes.
+- Strict classic single-frame DICOM validation, regular shear support, explicit
+  skip diagnostics, and opt-in PatientID retention.
+- Presets disable flips by default; optional normalization, CT HU fill and
+  in-plane DBT scale constraints. Explicit involutive laterality remapping.
+- Elastic boundary targets use continuous field extension independently of
+  constant image fill; conservative boxes bypass unnecessary corner inversion.
+- Bounded elastic gradients, optional Jacobian rejection, conservative boxes,
+  finite/range/size validation and per-class physical foreground checks.
+
+### Added
+
+- Schema/version/hash policy envelopes, stable per-sample seeding, exact RNG
+  checkpoint replay, pipeline ownership checks and Guard rejection telemetry.
+- Optional local preview/QA, percentile normalization, packaged model cards for
+  every transform, real framework and spawned-worker integration tests.
+- Measured JSON latency/memory benchmarks and a synthetic segmentation ablation
+  reporting a negative appearance-augmentation result; no clinical benefit claim.
+- Minimum-dependency, OS, framework, branch coverage and format CI jobs; offline
+  docs builds and an explicit release-event trusted-publishing workflow.
+- Single version source and v1 migration/release evidence guides.
+
+The following documentation resources were developed during pre-release work:
+
 
 ### Added
 
