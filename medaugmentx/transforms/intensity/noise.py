@@ -80,7 +80,7 @@ class GaussianNoise(Transform):
 
 
 class RicianNoise(Transform):
-    """Rician noise — the noise model for magnitude MRI.
+    """Rician magnitude noise under a single-complex-signal model.
 
     Rician noise arises naturally because the magnitude of complex Gaussian
     noise (which corrupts both real and imaginary k-space channels) is no
@@ -88,6 +88,11 @@ class RicianNoise(Transform):
     For high SNR it approaches Gaussian behaviour; for low-signal regions
     (e.g. CSF or air outside the head) it produces the characteristic
     elevated noise floor seen on real MRI.
+
+    Treats the input as a non-negative signal amplitude. Applying this to an
+    already noisy reconstruction adds another perturbation; it does not infer
+    or replace its existing noise. Multi-coil combination, parallel imaging,
+    and reconstruction processing can require different noise models.
 
     Args:
         std: Per-channel sigma — the standard deviation of the underlying

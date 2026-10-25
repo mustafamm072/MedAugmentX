@@ -39,8 +39,8 @@ class BrightnessContrast(Transform):
     Args:
         brightness: Additive offset range.  Scalar → symmetric ``(-v, +v)``;
             tuple → explicit ``(lo, hi)``.
-        contrast: Multiplicative factor range.  Scalar → ``(1-v, 1+v)``
-            centred on identity; tuple → explicit ``(lo, hi)``.  Must be > 0.
+        contrast: Multiplicative factor. Scalar → fixed factor; tuple →
+            sampled from ``(lo, hi)``. Must be > 0; ``1.0`` is identity.
         clip: Optional ``(min, max)`` to clamp the result.
         p: Probability of applying.
         seed: RNG seed.

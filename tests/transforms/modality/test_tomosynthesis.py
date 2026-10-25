@@ -85,11 +85,14 @@ class TestSliceDropout:
         np.testing.assert_array_equal(out.mask, dbt_vol.mask)
 
     def test_affect_mask_zeros_mask_too(self, dbt_vol):
-        out = SliceDropout(num_slices=2, affect_mask=True, seed=0)(dbt_vol)
-        # at least one originally-foreground slice should now be all-zero in mask
-        diffs = (out.mask != dbt_vol.mask).any(axis=(1, 2)).sum()
-        # not strict, but proves affect_mask had some effect
-        assert diffs >= 0
+        volume = dbt_vol.replace(
+            image=np.ones(dbt_vol.shape, dtype=np.float32),
+            mask=np.ones(dbt_vol.shape, dtype=np.uint8),
+        )
+        out = SliceDropout(num_slices=2, affect_mask=True, seed=0)(volume)
+        assert np.count_nonzero(np.all(out.mask == 0, axis=(1, 2))) == 2
+        np.testing.assert_array_equal(out.image, out.mask)
+        assert np.all(volume.mask == 1)
 
     def test_seedable(self, dbt_vol):
         a = SliceDropout(num_slices=2, seed=42)(dbt_vol)

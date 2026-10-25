@@ -88,6 +88,8 @@ def _walk_dict(d: Mapping[str, Any], path: tuple[int, ...]) -> Iterator[Pipeline
 
     params = dict(raw_params)
     children = params.pop("transforms", None)
+    if name == "Guard" and "transform" in params:
+        children = [params.pop("transform")]
     yield PipelineStep(path=path, name=name, params=params, depth=len(path))
 
     if children is None:

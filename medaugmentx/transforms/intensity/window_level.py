@@ -33,9 +33,9 @@ class WindowLevel(Transform):
     ``"window_width"`` keys those are used as the nominal values; otherwise
     the image min/max define the full-range window.
 
-    This is the single highest-impact augmentation for CT models that must
-    generalise across different radiological viewing protocols (bone, soft-
-    tissue, lung, mediastinum windows).
+    This varies the displayed intensity window; it does not simulate changes
+    in acquisition dose or the reconstruction kernel. Choose nominal windows
+    and perturbation ranges for the intended model input.
 
     Args:
         center_shift_frac: Fractional shift of the window centre relative to

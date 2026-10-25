@@ -45,6 +45,8 @@ def as_keypoints(points: object, ndim: int) -> np.ndarray:
         raise ValueError(
             f"keypoints must have shape (N, {ndim}) for a {ndim}D volume; got {arr.shape}"
         )
+    if not np.isfinite(arr).all():
+        raise ValueError("keypoint coordinates must be finite")
     return arr
 
 
@@ -59,6 +61,8 @@ def as_bboxes(boxes: object, ndim: int) -> np.ndarray:
         raise ValueError(
             f"bboxes must have shape (M, {2 * ndim}) for a {ndim}D volume; got {arr.shape}"
         )
+    if not np.isfinite(arr).all():
+        raise ValueError("bbox coordinates must be finite")
     mins, maxs = arr[:, :ndim], arr[:, ndim:]
     if arr.size and (maxs < mins).any():
         raise ValueError("each bbox must satisfy min <= max on every axis")
@@ -167,10 +171,14 @@ def displacement_map(
     """Point map for an elastic displacement field.
 
     ``displacements[ax]`` is the per-axis field ``d`` such that the image warp
-    reads ``out[x] = in[x + d[x]]``.  A landmark at input location ``p`` appears
-    in the output near ``p - d(p)``; the field is sampled at each point with
-    linear interpolation.  Exact for translations and a close approximation for
-    the smooth fields elastic deformation produces.
+    reads ``out[q] = in[q + d[q]]``. A landmark at input location ``p`` must
+    satisfy ``q + d(q) = p`` in the output. Fixed-point iteration solves that
+    equation using linearly interpolated fields, with a residual tolerance of
+    ``1e-5`` voxels and at most 100 iterations. Raises ``ValueError`` if the
+    inverse cannot be solved, rather than returning a misaligned target.
+
+    Convergence is expected for smooth fields with displacement gradients below
+    one. This is not a guarantee of a globally invertible or fold-free warp.
     """
     from scipy.ndimage import map_coordinates
 
@@ -178,12 +186,20 @@ def displacement_map(
         pts = np.asarray(pts, dtype=np.float64)
         if pts.shape[0] == 0:
             return pts.copy()
-        coords = pts.T  # (ndim, K)
         out = pts.copy()
-        for ax, field in enumerate(displacements):
-            sampled = map_coordinates(field, coords, order=1, mode=mode)
-            out[:, ax] = pts[:, ax] - sampled
-        return out
+        for _ in range(100):
+            sampled = np.column_stack([
+                map_coordinates(field, out.T, order=1, mode=mode, output=np.float64)
+                for field in displacements
+            ])
+            residual = out + sampled - pts
+            if np.isfinite(residual).all() and np.max(np.abs(residual)) <= 1e-5:
+                return out
+            out -= residual
+        raise ValueError(
+            "Could not invert elastic displacement field for geometric targets; "
+            "reduce alpha or increase sigma"
+        )
 
     return _fn
 

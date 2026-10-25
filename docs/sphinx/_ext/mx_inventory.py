@@ -51,7 +51,7 @@ CATEGORIES: list[tuple[str, str, str]] = [
         "medaugmentx.transforms.modality.tomosynthesis",
         "Tomosynthesis (DBT)",
         "Limited-angle reconstruction effects. These act on the reconstructed "
-        "volume and respect its strongly anisotropic voxel spacing.",
+        "volume with explicit slice-axis operations and per-axis voxel parameters.",
     ),
 ]
 
@@ -101,14 +101,17 @@ def parameters(cls: type) -> list[str]:
 def warps_targets(cls: type) -> bool:
     """Whether this transform maps keypoints and bounding boxes with the pixels.
 
-    A transform can only move targets by building a point map from
-    :mod:`medaugmentx.core.geometry` and handing it to ``MedVolume.warp``, so
-    the presence of that module in the defining module's namespace is an exact
-    structural test — no source-text heuristics and nothing to keep in sync by
-    hand. Both import styles are recognised: the module itself
+    Direct spatial implementations use :mod:`medaugmentx.core.geometry` and
+    ``MedVolume.warp``. Delegating wrappers must be recognised separately;
+    module imports alone cannot establish a wrapper's behavior.
+    Both import styles are recognised: the module itself
     (``from medaugmentx.core import geometry``) and individual helpers pulled
     out of it.
     """
+    from medaugmentx.transforms import AnisotropicElastic
+
+    if issubclass(cls, AnisotropicElastic):
+        return True
     module = inspect.getmodule(cls)
     if module is None:  # pragma: no cover - defensive
         return False

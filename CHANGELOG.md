@@ -45,6 +45,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- CT presets and recipes keep windowed data in its native HU intensity scale
+  before adding HU-scale noise. Model-input normalization is a separate step.
+- `RandomAffine` rotation labels now follow `(z, y, x)` array order; DBT
+  presets rotate about `z` for in-plane rotation. DBT elastic defaults and
+  teaching examples put the smallest displacement on the slice axis.
+- Elastic displacement components all use the spatial sigma tuple. Landmark
+  mapping iteratively inverts the pixel pull field and raises on nonconvergence
+  instead of returning the one-step `p - d(p)` approximation.
+- `MedVolume` rejects empty spatial axes, invalid spacing, and nonfinite
+  geometric targets. Scalar and range gamma values share finite/positive
+  validation. Low-resolution simulation retains non-empty temporary axes.
+- Pipeline inspection traverses guarded children. The transform catalog
+  recognizes target mapping delegated by `AnisotropicElastic`, and custom
+  transform examples retain integer constructor seeds.
 - The documentation site root no longer 404s. Sphinx writes its root document
   to `docs/sphinx/index.html` because the source directory is the repository
   root; `docs/sphinx/_extra/` now supplies a redirect (and `.nojekyll`) at the
@@ -52,6 +66,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Corrected geometry and preset behavior changes seeded outputs. Reproduce
+  previous experiments with their original package/environment; serialized
+  configuration does not guarantee identical behavior across library versions.
+- Added `docs/PROJECT_REVIEW.md` with reproduced defects, remaining release
+  blockers, and prioritized acceptance criteria. Documentation distinguishes
+  voxel-space settings and artifact approximations from validated physical
+  simulation and patient-space guarantees.
 - The documentation site is organised by task rather than presented as a flat
   list of files. The landing page orients the reader and routes them from a
   goal to a page; the sidebar groups everything under Getting started,

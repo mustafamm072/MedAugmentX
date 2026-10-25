@@ -89,9 +89,9 @@ intersphinx_mapping = {
     "numpy": ("https://numpy.org/doc/stable", None),
     "scipy": ("https://docs.scipy.org/doc/scipy", None),
 }
-# Resolving inventories over the network would make the build depend on three
-# external sites. CI builds with -W, so a slow or unreachable host must not be
-# able to fail a release; a missing link degrades to plain text instead.
+# Intersphinx fetches these inventories over the network. With -W an
+# unreachable inventory is a build failure, so strict builds need access to
+# these hosts (or a deliberately configured local inventory/offline mapping).
 intersphinx_timeout = 10
 intersphinx_disabled_reftypes = ["std:doc"]
 

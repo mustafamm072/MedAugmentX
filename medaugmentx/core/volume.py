@@ -60,6 +60,8 @@ class MedVolume:
             raise TypeError(f"image must be a numpy.ndarray, got {type(self.image).__name__}")
         if self.image.ndim not in (2, 3):
             raise ValueError(f"image must be 2D or 3D; got shape {self.image.shape}")
+        if any(size == 0 for size in self.image.shape):
+            raise ValueError("image spatial axes must be non-empty")
 
         if self.mask is not None:
             if not isinstance(self.mask, np.ndarray):
@@ -85,6 +87,8 @@ class MedVolume:
                     f"spacing has {len(self.spacing)} entries but image is {self.image.ndim}D"
                 )
             self.spacing = tuple(float(s) for s in self.spacing)
+            if any(not np.isfinite(s) or s <= 0 for s in self.spacing):
+                raise ValueError("spacing entries must be finite and positive")
         else:
             self.spacing = tuple(1.0 for _ in range(self.image.ndim))
 

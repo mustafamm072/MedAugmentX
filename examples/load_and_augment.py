@@ -47,7 +47,7 @@ def build_ct_pipeline(seed: int) -> Compose:
         RandomFlip(axes=("x",), p_per_axis=0.5),
         RandomAffine(rotation=8.0, scale=(0.9, 1.1), translation=(-0.03, 0.03), p=0.7),
         ElasticDeform(alpha=20.0, sigma=4.0, p=0.4),
-        WindowLevel(center_shift_frac=0.05, width_scale=(0.85, 1.15), p=0.6),
+        WindowLevel(center_shift_frac=0.05, width_scale=(0.85, 1.15), rescale_output=False, p=0.6),
         GaussianNoise(std=(5.0, 20.0), p=0.4),
         GammaCorrection(gamma=(0.9, 1.1), p=0.4),
     ], seed=seed)

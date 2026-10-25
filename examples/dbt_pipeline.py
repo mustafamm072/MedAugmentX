@@ -46,8 +46,8 @@ def build_dbt_pipeline(seed: int = 0) -> Compose:
     """Manual pipeline — tune transforms and parameters for your dataset."""
     return Compose([
         RandomFlip(axes=("x",), p_per_axis=0.5),
-        RandomAffine(rotation=5.0, scale=(0.95, 1.05), axes_enabled=("x", "y"), p=0.7),
-        AnisotropicElastic(alpha=(100.0, 100.0, 8.0), sigma=(8.0, 8.0, 2.0), p=0.4),
+        RandomAffine(rotation=5.0, scale=(0.95, 1.05), axes_enabled=("z",), p=0.7),
+        AnisotropicElastic(alpha=(8.0, 100.0, 100.0), sigma=(2.0, 8.0, 8.0), p=0.4),
         SlabShift(max_shift=2, p=0.5),
         LimitedAngleBlur(arc_degrees=(15.0, 25.0), base_sigma=1.0, p=0.3),
         SliceDropout(num_slices=(0, 2), p=0.2),

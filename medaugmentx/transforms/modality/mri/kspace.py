@@ -24,8 +24,9 @@ class KSpaceDropout(Transform):
        direction.
     3. Reconstructing the magnitude image via inverse FFT.
 
-    The result exhibits Gibbs ringing / truncation artifacts around edges —
-    the correct physics for this failure mode.
+    The result can exhibit ringing and aliasing. This is an approximation on
+    reconstructed image data; measured complex k-space and scanner-specific
+    acquisition/reconstruction effects are not modelled.
 
     Works on 2-D and 3-D volumes.  For 3-D, each axial slice is corrupted
     independently (independent random line selection per slice).

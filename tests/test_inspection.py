@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from medaugmentx import Compose, OneOf, iter_pipeline, pipeline_summary
+from medaugmentx import Compose, Guard, OneOf, iter_pipeline, pipeline_summary
 from medaugmentx.core import Transform
 from medaugmentx.inspection import PipelineStep
 from medaugmentx.transforms import GaussianNoise, RandomFlip, RicianNoise
@@ -82,3 +82,12 @@ def test_iter_pipeline_rejects_non_transform():
 def test_pipeline_summary_validates_max_value_length():
     with pytest.raises(ValueError, match="at least 8"):
         pipeline_summary(RandomFlip(), max_value_length=7)
+
+
+def test_guard_exposes_wrapped_pipeline_in_inspection_tree():
+    pipeline = Guard(Compose([RandomFlip(), GaussianNoise()]))
+    steps = list(iter_pipeline(pipeline))
+    assert [step.name for step in steps] == ["Guard", "Compose", "RandomFlip", "GaussianNoise"]
+    assert [step.path for step in steps] == [(), (0,), (0, 0), (0, 1)]
+    assert "transform" not in steps[0].params
+    assert "validator" in steps[0].params

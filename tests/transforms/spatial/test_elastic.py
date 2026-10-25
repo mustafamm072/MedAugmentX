@@ -35,3 +35,12 @@ def test_seedable_reproducibility():
     a = ElasticDeform(alpha=8.0, sigma=2.0, seed=99)(vol)
     b = ElasticDeform(alpha=8.0, sigma=2.0, seed=99)(vol)
     np.testing.assert_array_equal(a.image, b.image)
+
+
+def test_sigma_controls_spatial_smoothing_for_every_component():
+    fields = ElasticDeform(alpha=1, sigma=(0.5, 4, 4), seed=7)._displacements((24, 48, 48))
+    for field in fields:
+        # Each component should vary faster along z than along x or y.
+        roughness = [np.mean(np.diff(field, axis=ax) ** 2) for ax in range(3)]
+        assert roughness[0] > 3 * roughness[1]
+        assert roughness[0] > 3 * roughness[2]

@@ -46,7 +46,7 @@ from medaugmentx.transforms import (
 
 pipeline = Compose([
     RandomAffine(rotation=15, scale=(0.9, 1.1), p=0.7),
-    ElasticDeform(alpha=(120, 120, 10), sigma=(10, 10, 3), p=0.5),
+    ElasticDeform(alpha=(10, 120, 120), sigma=(3, 10, 10), p=0.5),
     OneOf([
         RicianNoise(std=0.02),
         GaussianNoise(std=0.015),
@@ -99,6 +99,9 @@ augmented = pipeline(vol)
 
 ## 5. CT pipeline with window/level and beam hardening
 
+This recipe expects native HU-scale input. Windowing clips without normalising
+so the following noise sigma remains in HU. Normalise for the model afterwards.
+
 ```python
 from medaugmentx import Compose
 from medaugmentx.transforms import (
@@ -111,7 +114,7 @@ ct_pipeline = Compose([
     RandomFlip(axes=("x",), p_per_axis=0.5, p=0.5),
     RandomAffine(rotation=8, scale=(0.9, 1.1), translation=(-0.03, 0.03), p=0.7),
     ElasticDeform(alpha=20.0, sigma=4.0, p=0.4),
-    WindowLevel(center_shift_frac=0.05, width_scale=(0.85, 1.15), p=0.6),
+    WindowLevel(center_shift_frac=0.05, width_scale=(0.85, 1.15), rescale_output=False, p=0.6),
     GaussianNoise(std=(5.0, 20.0), p=0.4),
     GammaCorrection(gamma=(0.9, 1.1), p=0.4),
     BeamHardening(alpha=(0.02, 0.07), p=0.3),         # cupping artifact
@@ -141,8 +144,8 @@ from medaugmentx.transforms import (
 
 pipeline = Compose([
     RandomFlip(axes=("x",), p_per_axis=0.5),
-    RandomAffine(rotation=5, scale=(0.95, 1.05), axes_enabled=("x", "y"), p=0.7),
-    AnisotropicElastic(alpha=(80, 80, 6), sigma=(8, 8, 2), p=0.5),
+    RandomAffine(rotation=5, scale=(0.95, 1.05), axes_enabled=("z",), p=0.7),
+    AnisotropicElastic(alpha=(6, 80, 80), sigma=(2, 8, 8), p=0.5),
     SlabShift(max_shift=2, p=0.5),
     LimitedAngleBlur(arc_degrees=(15.0, 25.0), base_sigma=1.0, p=0.6),
     SliceDropout(num_slices=(1, 2), p=0.3),
@@ -166,8 +169,10 @@ augmented = ct_pipeline(seed=0)(vol_ct)
 save_nifti(augmented, "ct_augmented.nii.gz")
 ```
 
-Both loaders populate `spacing` and `metadata` (modality, vendor, DICOM tags)
-automatically.
+Both loaders populate `spacing` and selected source metadata. NIfTI does not
+generally supply modality/vendor fields. Review the patient-space export
+limitations in [Commercial adoption](COMMERCIAL_ADOPTION.md) before saving
+volumes after crop, pad, or resize.
 
 > Requires the `io` extra: `pip install "medaugmentx[io]"`
 

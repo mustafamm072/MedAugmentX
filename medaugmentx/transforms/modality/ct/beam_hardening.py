@@ -18,8 +18,8 @@ class BeamHardening(Transform):
     When a polychromatic X-ray beam passes through tissue, lower-energy
     photons are preferentially absorbed (photoelectric absorption dominates).
     The beam reaching the centre of a homogeneous object is richer in
-    high-energy photons, which scatter less and thus appear *less* attenuating
-    than expected — the reconstructed centre looks darker than the periphery.
+    high-energy photons with lower effective attenuation than assumed by a
+    simple reconstruction — the centre can look darker than the periphery.
     This is the *cupping artifact*.
 
     Implementation: subtract a smooth radially-symmetric bowl profile from
@@ -27,6 +27,9 @@ class BeamHardening(Transform):
     the centre (maximal darkening) and tapers to zero at the edges.
 
     ``out = image - alpha * bowl(H, W) * image_range``
+
+    This is an image-domain cupping approximation. It does not trace rays,
+    model the X-ray spectrum, or infer patient/material attenuation.
 
     Works on 2-D and 3-D inputs.  For 3-D, the same bowl is applied to every
     axial slice.  The mask is never modified.

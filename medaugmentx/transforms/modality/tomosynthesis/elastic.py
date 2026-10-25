@@ -22,7 +22,9 @@ class AnisotropicElastic(Transform):
     wrapper around :class:`~medaugmentx.transforms.spatial.elastic.ElasticDeform`
     with defaults appropriate for DBT, and fails fast on 2D input.
 
-    Defaults: ``alpha=(100, 100, 8)``, ``sigma=(8, 8, 2)``.
+    Defaults in ``(z, y, x)`` order: ``alpha=(8, 100, 100)``,
+    ``sigma=(2, 8, 8)``. These are voxel-space settings, not an automatic
+    conversion from the volume's spacing.
 
     Args:
         alpha: Per-axis displacement magnitude in pixels.
@@ -34,8 +36,8 @@ class AnisotropicElastic(Transform):
 
     def __init__(
         self,
-        alpha: Sequence[float] = (100.0, 100.0, 8.0),
-        sigma: Sequence[float] = (8.0, 8.0, 2.0),
+        alpha: Sequence[float] = (8.0, 100.0, 100.0),
+        sigma: Sequence[float] = (2.0, 8.0, 8.0),
         order: int = 1,
         p: float = 1.0,
         seed: SeedLike = None,

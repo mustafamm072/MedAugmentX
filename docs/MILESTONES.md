@@ -79,7 +79,7 @@ training stacks while keeping the default install lightweight.
 | 3.2 | Typed package marker for downstream type checkers | `medaugmentx/py.typed` | ✅ `0.3.0` |
 | 3.3 | Developer API reference and updated examples | `docs/API_REFERENCE.md`, `docs/API_EXAMPLES.md` | ✅ `0.3.0` |
 | 3.4 | PyTorch backend for GPU-accelerated spatial transforms | `backends/torch/` | Planned |
-| 3.5 | TorchIO subject adapter and richer MONAI integration | `interop/` | ✅ `0.4.0` |
+| 3.5 | TorchIO subject adapter and MONAI-style dictionary integration | `interop/` | Adapter surface shipped `0.4.0`; real patient-space integration validation pending |
 | 3.6 | Commercial adoption and security guidance | `docs/COMMERCIAL_ADOPTION.md`, `SECURITY.md` | ✅ `0.4.0` |
 | 3.7 | Vendor DICOM parsers — Hologic, GE, Siemens | `io/dicom_vendor/` | Planned |
 | 3.8 | Remaining deferred transforms (motion, metal, scatter, grid, CLAHE, histogram match, compression, recon streak) + general transforms (cutout, resize/pad/crop, median blur, sharpen) | `transforms/` | ✅ `0.6.0` |
@@ -90,6 +90,8 @@ training stacks while keeping the default install lightweight.
 | 3.13 | Sphinx documentation site | `docs/sphinx/`, `.github/workflows/docs.yml` | ✅ `0.10.0` build; published to GitHub Pages (unreleased) |
 | 3.14 | Jupyter tutorials (MRI, CT, DBT) | `notebooks/`, `medaugmentx/phantoms.py` | ✅ unreleased |
 | 3.15 | v1.0 release + GitHub Actions CD pipeline | `.github/` | Planned |
+| 3.16 | Coherent patient-space affine, units, resampling, and DICOM geometry contracts | `core/`, `io/`, spatial transforms | Release blocker |
+| 3.17 | Actual framework-object integration CI and quantitative modality-model checks | `tests/`, `.github/` | Release blocker |
 
 ### Acceptance criteria (Phase 3 / v1.0)
 
@@ -98,6 +100,13 @@ training stacks while keeping the default install lightweight.
 - Framework-specific integrations are optional and import-lazy.
 - Commercial adoption docs cover intended use, dependency policy, audit
   trails, privacy/security posture, and clinical validation expectations.
+- Patient-space coordinates, affine, spacing, and units agree through I/O,
+  crop/pad/resize, and export, including oblique and anisotropic volumes.
+- Unsupported enhanced/multiframe DICOM objects fail explicitly until their
+  per-frame geometry and scaling are supported.
+- Optional integration jobs validate real framework objects and their geometry.
+- Preset intensity domains, voxel/mm units, laterality rules, and model
+  assumptions are documented and supported by quantitative regression tests.
 - GPU speedup ≥ 5× vs CPU baseline for spatial transforms.
 - All transforms complete in < 500 ms on CPU for a 512×512×80 DBT volume.
 - CI/CD publishes wheels to PyPI on tag.
@@ -133,3 +142,8 @@ validate real TorchIO/MONAI tensor and patient-space affine behavior with option
 fixtures, publish the documentation preview, and configure trusted publishing
 with the maintainer's PyPI project. Add measured benchmark comparisons before
 making speed or model-quality claims. GPU acceleration should remain optional.
+
+The [October 2026 project review](PROJECT_REVIEW.md) records reproduced defects
+and a proposed sequence: patient-space geometry and real integrations first,
+task/preset contracts next, then research provenance and performance. Passing
+unit tests or reaching a speed target does not waive the correctness gates.

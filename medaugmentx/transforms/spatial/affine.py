@@ -29,11 +29,12 @@ class RandomAffine(Transform):
 
     Supports both 2D and 3D inputs. For 3D, rotation is sampled per axis, and
     you can disable specific axes with ``axes_enabled``. Scaling and
-    translation are isotropic-by-default but per-axis ranges may be supplied.
+    translation are sampled independently per axis from shared ranges.
 
-    Anisotropic-aware: passing ``axes_enabled=("x", "y")`` (i.e. disabling
-    out-of-plane rotation) is the recommended setup for tomosynthesis volumes
-    where the Z axis has very different sampling than XY.
+    For in-plane-only rotation of a 3D volume, pass ``axes_enabled=("z",)``:
+    rotation about the slice axis mixes only the row/column coordinates.
+    All geometry is in voxel coordinates; spacing does not convert rotations
+    to physical millimetres on anisotropic grids.
 
     Args:
         rotation: Maximum rotation in degrees. Either a scalar (interpreted
@@ -41,8 +42,9 @@ class RandomAffine(Transform):
         scale: Per-axis scale factor range. Default ``(1.0, 1.0)`` (no scale).
         translation: Per-axis translation as a fraction of the volume size,
             ``(low, high)``. Default ``(0.0, 0.0)`` (no translation).
-        axes_enabled: Which spatial axis labels participate in rotation.
-            Defaults to all axes. Use ``("x", "y")`` for in-plane only.
+        axes_enabled: Axes to rotate about. Defaults to all axes. Use
+            ``("z",)`` for in-plane-only 3D rotation. For 2D, including
+            ``"x"`` or ``"y"`` enables the single in-plane angle.
         order: Spline order for image interpolation (0–5). Mask uses ``order=0``.
         mode: ``scipy.ndimage`` boundary mode (``'constant'``, ``'reflect'``,
             ``'nearest'``).
@@ -109,10 +111,11 @@ class RandomAffine(Transform):
         cz, sz = np.cos(rz), np.sin(rz)
         cy, sy = np.cos(ry), np.sin(ry)
         cx, sx = np.cos(rx), np.sin(rx)
-        # Compose Rz * Ry * Rx; rotations applied around image centre.
-        Rx = np.array([[1, 0, 0], [0, cx, -sx], [0, sx, cx]], dtype=np.float64)
+        # Matrices act on (z, y, x), so a rotation about z leaves axis 0
+        # unchanged, while a rotation about x leaves axis 2 unchanged.
+        Rz = np.array([[1, 0, 0], [0, cz, -sz], [0, sz, cz]], dtype=np.float64)
         Ry = np.array([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]], dtype=np.float64)
-        Rz = np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]], dtype=np.float64)
+        Rx = np.array([[cx, -sx, 0], [sx, cx, 0], [0, 0, 1]], dtype=np.float64)
         return Rz @ Ry @ Rx
 
     @staticmethod

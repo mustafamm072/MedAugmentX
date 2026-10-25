@@ -67,6 +67,7 @@ Invariants enforced in `__post_init__`:
 - keypoints are `(N, ndim)`, bboxes are `(M, 2*ndim)` with `min <= max`,
 - labels, when present, are 1D with one entry per target,
 - spacing length matches image ndim (defaults to all-1.0 if omitted),
+- spatial axes are non-empty; spacing is finite and positive; target coordinates are finite,
 - metadata is a dict.
 
 `replace()` returns a shallow copy with selected fields swapped (`None` means
@@ -163,14 +164,20 @@ image/mask alignment lives in `tests/integration/test_full_pipeline.py`.
 
 ### Anisotropic awareness
 
-DBT volumes typically have `(1.0, 0.1, 0.1) mm` spacing — ten times more
-compressed along Z than in-plane. Elastic deformation, bias fields, and
-limited-angle blur are all anisotropy-aware:
+DBT volumes can have `(1.0, 0.1, 0.1) mm` spacing — coarser sampling along Z
+than in-plane. Parameters are expressed in voxels and must be chosen to match
+the grid; these transforms do not automatically read spacing to set strength:
 
-- `ElasticDeform(alpha=(120, 120, 10), sigma=(10, 10, 3))` — per-axis magnitude
+- `ElasticDeform(alpha=(10, 120, 120), sigma=(3, 10, 10))` — per-axis magnitude
 - `AnisotropicElastic` — thin wrapper with DBT defaults that fails fast on 2D input
+- `RandomAffine(axes_enabled=("z",))` — rotation about the slice axis, in-plane only
 - `LimitedAngleBlur` — applies blur only along Z, scaled by acquisition arc angle
 - `BiasField(coarse_shape=4)` — independent coarse grid per axis, upsampled uniformly
+
+Every displacement component uses the same spatial `sigma` tuple; `alpha`
+controls the component magnitudes. Landmark mapping solves the inverse pull
+field to a bounded residual and raises if it cannot converge. Nonlinear box
+mapping still uses only corners and may underestimate warped extents.
 
 ### Serialisation contract
 

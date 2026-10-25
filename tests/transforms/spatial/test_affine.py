@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from medaugmentx.core import MedVolume
 from medaugmentx.transforms import RandomAffine
@@ -59,3 +60,17 @@ def test_p_zero_is_identity():
     vol = MedVolume(image=img)
     out = RandomAffine(rotation=45.0, p=0.0, seed=0)(vol)
     np.testing.assert_array_equal(out.image, img)
+
+
+@pytest.mark.parametrize("label,axis", [("z", 0), ("y", 1), ("x", 2)])
+def test_rotation_preserves_coordinate_on_named_axis(label, axis):
+    image = np.zeros((11, 11, 11), dtype=np.float32)
+    point = np.array([3, 4, 7])
+    image[tuple(point)] = 1
+    volume = MedVolume(image, mask=image.astype(np.uint8), keypoints=[point])
+    out = RandomAffine(rotation=(90, 90), axes_enabled=(label,), seed=0)(volume)
+    np.testing.assert_allclose(out.keypoints[0, axis], point[axis], atol=1e-8)
+    assert not np.allclose(out.keypoints[0], point)
+    peak = np.unravel_index(out.image.argmax(), out.shape)
+    np.testing.assert_allclose(out.keypoints[0], peak, atol=1e-8)
+    assert out.mask[peak] == 1

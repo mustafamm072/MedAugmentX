@@ -29,11 +29,11 @@ for local clinical, regulatory, security, and dataset validation.
 | Problem with general-purpose augmentation | What MedAugmentX does |
 | --- | --- |
 | Treats every image as 2D RGB | Native 3D volumes with anisotropic-aware ops |
-| No MRI-specific noise or artifact models | Physics-based Rician noise, bias field, k-space corruption, ghosting |
+| No MRI-specific noise or artifact models | Rician magnitude-noise model and approximate bias, k-space, and ghosting effects |
 | CT/DXR augmentation is generic brightness shift | Window/level variation, beam hardening, resolution simulation |
-| Masks drift on complex transforms | Deterministic seeding; image and mask share the same random draw |
+| Masks drift on complex transforms | Image and mask use the same sampled geometry; labels use nearest-neighbour interpolation |
 | No tomosynthesis support | Dedicated DBT module with slab-aware augmentations |
-| DICOM/NIfTI I/O scattered across libraries | One loader, one `MedVolume`, vendor metadata preserved |
+| DICOM/NIfTI I/O scattered across libraries | Optional loaders into `MedVolume`, retaining selected source metadata |
 | Pipelines can't be saved or reloaded | Full JSON/YAML serialisation with round-trip reconstruction |
 
 ---
@@ -171,7 +171,7 @@ vol = MedVolume(
 
 augment = Compose([
     RandomAffine(rotation=15, scale=(0.9, 1.1), p=0.7),
-    ElasticDeform(alpha=(120, 120, 10), sigma=(10, 10, 3), p=0.5),
+    ElasticDeform(alpha=(10, 120, 120), sigma=(3, 10, 10), p=0.5),
     BiasField(alpha=0.3, p=0.7),
     OneOf([
         RicianNoise(std=(0.005, 0.02)),   # MRI physical noise model
@@ -184,8 +184,9 @@ out = augment(vol)           # mask kept in sync automatically
 print(out.image.shape, out.mask.shape)
 ```
 
-Mask values are preserved exactly — spatial transforms use nearest-neighbour
-interpolation for the mask and the same random draw as the image.
+Spatial transforms use nearest-neighbour interpolation for masks, so label IDs
+are never blended. Cropping and resampling can remove small structures or whole
+classes; `Guard` can check for label loss.
 
 ---
 
@@ -205,6 +206,12 @@ dbt  = dbt_pipeline(seed=42)  # slab shift, limited-angle blur, anisotropic elas
 
 Each preset is a starting point — tune the parameters or swap transforms for
 your dataset.
+
+`ct_pipeline` expects native HU-scale inputs and keeps that intensity scale;
+its windowing clips without normalising. Apply any deterministic model-input
+windowing/normalisation afterwards. MRI, DXR, and DBT presets use noise or
+brightness settings intended for roughly `[0, 1]` inputs. Presets operate in
+voxel coordinates and do not infer anatomical directions from patient metadata.
 
 ---
 
@@ -370,8 +377,10 @@ augmented = ct_pipeline(seed=0)(vol_ct)
 save_nifti(augmented, "ct_augmented.nii.gz")
 ```
 
-Both loaders populate `spacing` and `metadata` (modality, vendor, DICOM tags)
-automatically.
+Both loaders populate `spacing` and selected source metadata. NIfTI does not
+generally encode modality or vendor, so these are not inferred by that loader.
+Patient-space export after crop/pad/resize and real framework affine behavior
+still have limitations; review [remaining geometry limitations](docs/COMMERCIAL_ADOPTION.md#remaining-geometry-limitations-before-a-stable-release).
 
 > Requires the `io` extra: `pip install "medaugmentx[io]"`
 
@@ -441,7 +450,7 @@ See [API examples](docs/API_EXAMPLES.md) and the
 | `RandomAffine` | Rotation + scaling + translation, 2D/3D, axis-aware |
 | `RandomFlip` | Per-axis flip with independent probability |
 | `AnatomicCrop` | Foreground-biased random crop |
-| `ElasticDeform` | Anisotropic B-spline elastic deformation |
+| `ElasticDeform` | Gaussian-smoothed elastic displacement fields with per-axis parameters |
 | `CoarseDropout` | Cutout-style random box occlusion (2D/3D) |
 | `Resize` | Resample to a fixed shape (rescales spacing) |
 | `Pad` | Centre-pad up to a target shape |
@@ -452,7 +461,7 @@ See [API examples](docs/API_EXAMPLES.md) and the
 | Transform | What it does |
 | --- | --- |
 | `GaussianNoise` | Additive zero-mean Gaussian noise |
-| `RicianNoise` | MRI magnitude noise (physically correct for low-SNR regions) |
+| `RicianNoise` | Single-complex-signal magnitude noise model; reconstruction assumptions matter |
 | `GammaCorrection` | Power-law contrast, normalisation-aware |
 | `BiasField` | Smooth multiplicative field (MRI coil inhomogeneity) |
 | `WindowLevel` | Random CT window/level shift (protocol variation) |

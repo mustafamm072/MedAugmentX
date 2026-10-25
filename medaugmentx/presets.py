@@ -29,11 +29,11 @@ def mri_pipeline(seed: SeedLike = None) -> Compose:
     Applies a representative mix of spatial deformations, intensity
     perturbations, and MRI-specific artifacts:
 
-    * Random flip (L–R, the only anatomically valid flip for most brain MRI).
+    * Random flip along the array column axis (task/orientation dependent).
     * Random affine — small rotations and scaling.
     * Elastic deformation — simulate tissue deformability.
     * Bias field — RF coil / B0 inhomogeneity.
-    * Rician noise — the physically correct MRI noise model.
+    * Rician noise — a single-complex-signal magnitude-noise approximation.
     * Gamma correction — scanner contrast variation.
     * One of: ghosting artifact, k-space line dropout, *or* motion blur.
 
@@ -82,7 +82,7 @@ def ct_pipeline(seed: SeedLike = None) -> Compose:
 
     Combines spatial augmentations with CT-specific intensity transforms:
 
-    * Random flip along L–R.
+    * Random flip along the array column axis (task/orientation dependent).
     * Random affine — small rotations and scaling.
     * Elastic deformation.
     * Window / level variation — simulates protocol differences across sites.
@@ -90,6 +90,11 @@ def ct_pipeline(seed: SeedLike = None) -> Compose:
     * Gamma correction — contrast variation.
     * Beam hardening (cupping artifact) — applied occasionally.
     * Metal streak artifact — implant/clip simulation, applied rarely.
+
+    Expects native HU-scale CT input and keeps that intensity scale throughout:
+    windowing clips without normalising, so the noise sigma remains in HU.
+    Apply deterministic windowing/normalisation after this preset if needed.
+    Augmented values are synthetic and no longer calibrated measurements.
 
     Args:
         seed: Top-level RNG seed for reproducibility.
@@ -111,7 +116,8 @@ def ct_pipeline(seed: SeedLike = None) -> Compose:
             RandomFlip(axes=("x",), p_per_axis=0.5, p=0.5),
             RandomAffine(rotation=8.0, scale=(0.9, 1.1), translation=(-0.03, 0.03), p=0.7),
             ElasticDeform(alpha=20.0, sigma=4.0, p=0.4),
-            WindowLevel(center_shift_frac=0.05, width_scale=(0.85, 1.15), p=0.6),
+            WindowLevel(center_shift_frac=0.05, width_scale=(0.85, 1.15),
+                        rescale_output=False, p=0.6),
             GaussianNoise(std=(5.0, 20.0), p=0.4),
             GammaCorrection(gamma=(0.9, 1.1), p=0.4),
             BeamHardening(alpha=(0.02, 0.07), p=0.3),
@@ -131,7 +137,7 @@ def dxr_pipeline(seed: SeedLike = None) -> Compose:
 
     Applies 2-D-safe transforms only:
 
-    * Horizontal flip (L–R chest flip is anatomically valid in practice).
+    * Horizontal flip (requires a task that tolerates laterality reversal).
     * Slight affine — small rotation (patient positioning variation).
     * Gaussian blur — simulates detector resolution variation.
     * Brightness/contrast — exposure variation between scanners.
@@ -192,7 +198,7 @@ def dbt_pipeline(seed: SeedLike = None) -> Compose:
     new Phase-2 intensity transforms:
 
     * Random flip — horizontal axis only (breast anatomy).
-    * Anisotropic affine — in-plane rotation only (``axes_enabled=("x","y")``).
+    * Affine — in-plane rotation only (``axes_enabled=("z",)``).
     * Anisotropic elastic deformation — larger XY alpha, small Z.
     * Compression variation — breast-paddle compression differences.
     * Slab shift — reconstruction centre variation.
@@ -225,12 +231,12 @@ def dbt_pipeline(seed: SeedLike = None) -> Compose:
             RandomAffine(
                 rotation=5.0,
                 scale=(0.95, 1.05),
-                axes_enabled=("x", "y"),
+                axes_enabled=("z",),
                 p=0.7,
             ),
             AnisotropicElastic(
-                alpha=(80.0, 80.0, 6.0),
-                sigma=(8.0, 8.0, 2.0),
+                alpha=(6.0, 80.0, 80.0),
+                sigma=(2.0, 8.0, 8.0),
                 p=0.5,
             ),
             CompressionVariation(scale=(0.9, 1.1), axis="y", p=0.4),

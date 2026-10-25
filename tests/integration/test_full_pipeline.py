@@ -96,22 +96,14 @@ def test_image_mask_alignment_under_many_seeds():
 
     pipeline_factory = lambda seed: Compose([  # noqa: E731
         RandomFlip(axes=("x", "y"), p_per_axis=0.5),
-        RandomAffine(rotation=20.0, scale=(0.9, 1.1)),
-        ElasticDeform(alpha=4.0, sigma=2.0),
+        RandomAffine(rotation=20.0, scale=(0.9, 1.1), order=0),
+        ElasticDeform(alpha=4.0, sigma=2.0, order=0),
     ], seed=seed)
 
     for s in range(100):
         out = pipeline_factory(s)(vol)
-        # Wherever mask == 1, image should be > 0; wherever image > 0.5, mask is 1.
-        # Allow small interpolation-driven softening at the boundary by checking
-        # that the *areas* match within ~25% (transforms preserve area to that).
-        img_fg = (out.image > 0.3).sum()
-        msk_fg = (out.mask > 0).sum()
-        # At least one of them should be non-zero (transform didn't blank the volume).
-        assert img_fg > 0 and msk_fg > 0, f"blank result at seed {s}"
-        # Mask centroid should sit within image foreground bbox
-        msk_idx = np.argwhere(out.mask > 0)
-        cy, cx = msk_idx.mean(axis=0)
-        assert out.image[int(round(cy)), int(round(cx))] > 0.05, (
-            f"mask centroid outside image foreground at seed {s}"
-        )
+        # Use identical interpolation to isolate shared geometry from the
+        # different edge softening of linear image/nearest mask interpolation.
+        # A centroid check can pass for translated or enlarged masks.
+        assert np.any(out.mask), f"blank result at seed {s}"
+        np.testing.assert_array_equal(out.image, out.mask, err_msg=f"seed {s}")

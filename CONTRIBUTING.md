@@ -88,7 +88,7 @@ class MyTransform(Transform):
     def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.__class__.__name__,
-            "params": {"strength": self.strength, "p": self.p},
+            "params": {"strength": self.strength, "p": self.p, "seed": self._seed},
         }
 ```
 

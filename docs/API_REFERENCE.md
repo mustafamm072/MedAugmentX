@@ -57,7 +57,7 @@ Boxes are `(M, 2*ndim)`, laid out low corner first: `[min_axis0, …, max_axis0,
 | --- | --- |
 | `RandomFlip` | Reflect coordinates along the flipped axes |
 | `RandomAffine` | Forward affine map about the volume centre, plus translation |
-| `ElasticDeform` | Sample the displacement field at each point |
+| `ElasticDeform`, `AnisotropicElastic` | Iteratively invert the pixel pull field at each point; raise if inversion does not converge |
 | `AnatomicCrop`, `CenterCrop` | Shift by the crop origin (may go negative) |
 | `Pad` | Shift by the pad width |
 | `Resize` | Align voxel centres using `(new_size - 1) / (old_size - 1)`; singleton axes map to zero |
@@ -65,8 +65,8 @@ Boxes are `(M, 2*ndim)`, laid out low corner first: `[min_axis0, …, max_axis0,
 | `CompressionVariation` | Scale about the volume centre on the compression axis |
 | `CoarseDropout`, all intensity and artifact transforms | Unchanged (pass through) |
 
-The catalog's *Targets* column is generated from the code and is the
-authoritative version of this list.
+The catalog's *Targets* column is generated from the code. Delegating wrappers
+also map targets, even when their own module does not import geometry helpers.
 
 **Boxes under rotation.** A box is mapped through its `2**ndim` corners and
 re-bounded to an axis-aligned box, so it stays valid but may grow. For

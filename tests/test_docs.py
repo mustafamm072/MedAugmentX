@@ -102,12 +102,12 @@ def test_targets_column_matches_documented_behaviour():
     """The generated "Targets" column against the hand-written specification.
 
     ``docs/API_REFERENCE.md`` states which transforms warp keypoints and boxes.
-    The catalog derives the same fact from whether the defining module uses
-    ``medaugmentx.core.geometry``. If the two ever disagree, one of them is
+    The catalog uses geometry imports and recognises delegating wrappers.
+    If the two ever disagree, one of them is
     wrong and readers are being told two different things.
     """
     expected_warping = {
-        "RandomFlip", "RandomAffine", "ElasticDeform", "AnatomicCrop",
+        "RandomFlip", "RandomAffine", "ElasticDeform", "AnisotropicElastic", "AnatomicCrop",
         "CenterCrop", "Pad", "Resize", "SlabShift", "CompressionVariation",
     }
     actual = {cls.__name__ for cls in TRANSFORMS if inventory.warps_targets(cls)}

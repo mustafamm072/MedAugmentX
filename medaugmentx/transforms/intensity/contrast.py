@@ -43,9 +43,10 @@ class GammaCorrection(Transform):
             self.gamma_range: tuple[float, float] = (float(gamma), float(gamma))
         else:
             lo, hi = float(gamma[0]), float(gamma[1])
-            if lo <= 0 or hi < lo:
-                raise ValueError(f"gamma range must be positive and ordered, got {gamma}")
             self.gamma_range = (lo, hi)
+        lo, hi = self.gamma_range
+        if not np.isfinite([lo, hi]).all() or not 0 < lo <= hi:
+            raise ValueError(f"gamma must be finite, positive and ordered, got {gamma}")
         self.invert = bool(invert)
 
     def apply(self, volume: MedVolume) -> MedVolume:

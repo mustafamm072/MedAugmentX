@@ -39,6 +39,12 @@ def test_negative_gamma_rejected():
         GammaCorrection(gamma=(-1.0, 1.0))
 
 
+@pytest.mark.parametrize("gamma", [0, -1, np.nan, np.inf, (np.nan, 1), (1, np.inf)])
+def test_invalid_scalar_or_range_gamma_rejected(gamma):
+    with pytest.raises(ValueError, match="finite, positive and ordered"):
+        GammaCorrection(gamma=gamma)
+
+
 def test_seedable_reproducibility():
     img = np.linspace(0.0, 1.0, 64, dtype=np.float32).reshape(8, 8)
     vol = MedVolume(image=img)

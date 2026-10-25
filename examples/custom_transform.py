@@ -39,7 +39,7 @@ class IntensityShift(Transform):
     def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.__class__.__name__,
-            "params": {"max_shift": self.max_shift, "p": self.p},
+            "params": {"max_shift": self.max_shift, "p": self.p, "seed": self._seed},
         }
 
 

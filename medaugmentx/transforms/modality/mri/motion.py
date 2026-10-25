@@ -18,9 +18,9 @@ class MRIMotion(Transform):
     """Simulate MRI in-plane rigid-body motion (blur + ghosting).
 
     During a scan the patient occupies several slightly different positions.
-    Because k-space is filled across the whole acquisition, the reconstructed
-    image is effectively a weighted average of those positions, producing the
-    characteristic motion blur and edge ghosting seen on clinical MRI.
+    This image-domain approximation produces blur and ghost-like replicas. It
+    does not simulate the timing or phase inconsistency of motion during
+    k-space acquisition, which generally differs from averaging images.
 
     This transform averages the original image with a few mildly
     rotated/translated copies (in-plane only).  For 3-D volumes the same

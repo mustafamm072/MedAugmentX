@@ -116,3 +116,13 @@ def test_low_res_to_dict_round_trip():
     t2 = SimulateLowResolution(**d["params"])
     assert t2.zoom_range == t.zoom_range
     assert t2.per_axis == t.per_axis
+
+
+@pytest.mark.parametrize("shape", [(1, 8, 8), (2, 8, 8), (1, 8), (2, 2)])
+def test_low_resolution_keeps_at_least_one_voxel_per_axis(shape):
+    image = np.arange(np.prod(shape), dtype=np.float32).reshape(shape)
+    volume = MedVolume(image, mask=np.ones(shape, dtype=np.uint8))
+    out = SimulateLowResolution(zoom_range=(0.1, 0.1), seed=0)(volume)
+    assert out.shape == shape
+    assert np.isfinite(out.image).all()
+    np.testing.assert_array_equal(out.mask, volume.mask)

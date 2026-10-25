@@ -10,6 +10,13 @@ from medaugmentx.core import MedVolume, geometry
 
 
 class TestTargetConstruction:
+    @pytest.mark.parametrize("value", [np.nan, np.inf, -np.inf])
+    @pytest.mark.parametrize("field", ["keypoints", "bboxes"])
+    def test_rejects_nonfinite_coordinates(self, value, field):
+        coords = [[value, 1]] if field == "keypoints" else [[0, 0, value, 2]]
+        with pytest.raises(ValueError, match="finite"):
+            MedVolume(np.zeros((8, 8)), **{field: coords})
+
     def test_keypoints_and_bboxes_2d(self):
         v = MedVolume(
             image=np.zeros((8, 8), dtype=np.float32),
@@ -175,6 +182,18 @@ class TestRemoveOutOfBounds:
 
 
 class TestGeometryHelpers:
+    def test_elastic_map_inverts_nonconstant_pull_field(self):
+        y, x = np.mgrid[:32, :32]
+        mapping = geometry.displacement_map([0.5 * y, np.zeros_like(x, dtype=float)])
+        np.testing.assert_allclose(mapping(np.array([[12.0, 10.0]])), [[8, 10]], atol=1e-5)
+
+    def test_elastic_map_rejects_unsolved_inverse(self):
+        y, x = np.mgrid[:32, :32]
+        # Every output y samples input y=0; input y=12 has no inverse.
+        mapping = geometry.displacement_map([-y.astype(float), np.zeros_like(x, dtype=float)])
+        with pytest.raises(ValueError, match="invert"):
+            mapping(np.array([[12.0, 10.0]]))
+
     def test_flip_map(self):
         fn = geometry.flip_map((1,), (10, 20))
         out = fn(np.array([[3.0, 5.0]]))

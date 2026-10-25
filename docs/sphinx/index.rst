@@ -23,8 +23,9 @@ returns a new one, so annotations stay consistent with the pixels.
 
    augmented = pipeline(MedVolume(image, mask=mask, spacing=(1.0, 0.9, 0.9)))
 
-The pipeline is seeded, so the same seed reproduces the same draw sequence on
-any machine, and it round-trips through JSON or YAML for an experiment record.
+Fresh equivalent pipelines with the same integer seed reproduce the draw
+sequence in the same software environment. JSON or YAML stores configuration,
+not an in-progress random-state checkpoint.
 
 Where to start
 --------------
@@ -63,10 +64,11 @@ Where to start
 What makes it different
 -----------------------
 
-**Modality physics, not generic image ops.** MRI k-space dropout, CT beam
-hardening, X-ray scatter, and limited-angle tomosynthesis blur are modelled as
-the acquisition artifacts they are, not approximated with a blur kernel. The
-:doc:`catalog <catalog>` lists what each one simulates.
+**Modality-specific approximations.** MRI k-space dropout, CT cupping,
+X-ray scatter, and limited-angle tomosynthesis blur offer controllable
+appearance perturbations. Several use simple image-domain kernels; these
+are not validated scanner simulators. The :doc:`catalog <catalog>` lists
+the implemented effects.
 
 **Annotations move with the pixels.** Spatial transforms map masks, keypoints,
 and bounding boxes through the same sampled geometry, using nearest-neighbour
@@ -115,6 +117,7 @@ finite, non-collapsed, labels intact — and can raise, warn, revert, or retry.
    :hidden:
 
    Roadmap <../MILESTONES>
+   Project review <../PROJECT_REVIEW>
    Contributing <../../CONTRIBUTING>
    Working on the docs <../README>
    Security policy <../../SECURITY>

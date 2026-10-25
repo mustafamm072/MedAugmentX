@@ -5,6 +5,7 @@ import pytest
 from medaugmentx import Compose, MedVolume
 from medaugmentx.presets import ct_pipeline, dbt_pipeline, dxr_pipeline, mri_pipeline
 from medaugmentx.serialization import from_json, to_json
+from medaugmentx.transforms import AnisotropicElastic, GaussianNoise, RandomAffine, WindowLevel
 
 
 @pytest.fixture
@@ -139,3 +140,27 @@ def test_dbt_pipeline_serialisable():
     pipeline = dbt_pipeline(seed=0)
     rt = from_json(to_json(pipeline))
     assert isinstance(rt, Compose)
+
+
+@pytest.mark.parametrize("window,noise", [(True, False), (False, True), (True, True)])
+def test_ct_preset_keeps_native_intensity_scale(window, noise):
+    volume = MedVolume(np.linspace(-1000, 1000, 1024, dtype=np.float32).reshape(32, 32))
+    pipeline = ct_pipeline(seed=0)
+    for transform in pipeline:
+        transform.p = float(
+            (window and isinstance(transform, WindowLevel))
+            or (noise and isinstance(transform, GaussianNoise))
+        )
+    out = pipeline(volume)
+    assert out.image.min() < -100
+    assert out.image.max() > 100
+
+
+def test_dbt_preset_uses_in_plane_rotation_and_small_slice_displacements():
+    pipeline = dbt_pipeline(seed=0)
+    affine = next(t for t in pipeline if isinstance(t, RandomAffine))
+    elastic = next(t for t in pipeline if isinstance(t, AnisotropicElastic))
+    assert affine.axes_enabled == ("z",)
+    assert elastic.alpha[0] < min(elastic.alpha[1:])
+    default = AnisotropicElastic()
+    assert default.alpha[0] < min(default.alpha[1:])

@@ -141,7 +141,11 @@ class SimulateLowResolution(Transform):
             f = float(self.rng.uniform(*self.zoom_range))
             factors = [f] * ndim
 
-        small = zoom(image, factors, order=self.order_down, mode="reflect")
+        # A small factor can round a short axis to zero voxels. Use explicit
+        # non-empty target dimensions before asking scipy to resample.
+        small_shape = [max(1, round(s * f)) for s, f in zip(original_shape, factors)]
+        down_factors = [t / s for t, s in zip(small_shape, original_shape)]
+        small = zoom(image, down_factors, order=self.order_down, mode="reflect")
         up_factors = [o / s for o, s in zip(original_shape, small.shape)]
         large = zoom(small, up_factors, order=self.order_up, mode="reflect")
 

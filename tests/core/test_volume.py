@@ -5,6 +5,16 @@ from medaugmentx.core import MedVolume
 
 
 class TestMedVolume:
+    @pytest.mark.parametrize("spacing", [(0, 1), (-1, 1), (np.nan, 1), (1, np.inf)])
+    def test_rejects_invalid_physical_spacing(self, spacing):
+        with pytest.raises(ValueError, match="finite and positive"):
+            MedVolume(np.zeros((4, 4)), spacing=spacing)
+
+    @pytest.mark.parametrize("shape", [(0, 4), (2, 0, 4)])
+    def test_rejects_empty_spatial_axes(self, shape):
+        with pytest.raises(ValueError, match="non-empty"):
+            MedVolume(np.zeros(shape))
+
     def test_2d_construction(self):
         img = np.zeros((10, 10), dtype=np.float32)
         v = MedVolume(image=img)

@@ -27,23 +27,25 @@ def _broadcast(value: ScalarOrSeq, ndim: int, name: str) -> tuple[float, ...]:
 
 
 class ElasticDeform(Transform):
-    """B-spline-style elastic deformation via smoothed random displacements.
+    """Elastic deformation via Gaussian-smoothed random displacements.
 
     Implementation follows the standard Simard / Castro-Pereira approach:
 
     1. Sample independent uniform displacement fields per spatial axis.
-    2. Smooth each field with a Gaussian of axis-specific ``sigma``.
+    2. Smooth every field with the same spatial Gaussian sigmas.
     3. Scale each field by axis-specific ``alpha``.
     4. Warp the image (linear interp) and mask (nearest neighbour) using
        :func:`scipy.ndimage.map_coordinates` with the same displacement.
 
     Anisotropic ``alpha`` and ``sigma`` are essential for tomosynthesis-like
     volumes where the slice axis has very different sampling than the
-    in-plane axes (e.g. ``alpha=(120, 120, 10)``, ``sigma=(10, 10, 3)``).
+    in-plane axes (e.g. ``alpha=(10, 120, 120)``, ``sigma=(3, 10, 10)``
+    in ``(z, y, x)`` order). Parameters are in voxels; spacing is not used.
 
     Args:
         alpha: Per-axis displacement magnitude in pixels.
-        sigma: Per-axis Gaussian smoothing sigma.
+        sigma: Gaussian smoothing sigma per spatial axis, applied to every
+            displacement component in array-axis order.
         order: Spline order for image interpolation (mask always uses 0).
         mode: ``map_coordinates`` boundary mode.
         cval: Fill value for ``mode='constant'``.
@@ -77,8 +79,8 @@ class ElasticDeform(Transform):
         fields = []
         for ax in range(ndim):
             raw = self.rng.uniform(-1.0, 1.0, size=shape).astype(np.float32)
-            if sigmas[ax] > 0:
-                raw = gaussian_filter(raw, sigma=sigmas[ax], mode="reflect")
+            if any(s > 0 for s in sigmas):
+                raw = gaussian_filter(raw, sigma=sigmas, mode="reflect")
             fields.append(raw * float(alphas[ax]))
         return fields
 
