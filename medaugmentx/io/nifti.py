@@ -30,6 +30,7 @@ def load_nifti(
     unknown units are explicitly assumed mm with a warning. Source orientation
     is preserved, not canonicalized. Four-dimensional time/channel data is
     unsupported except for a trailing singleton dimension.
+    Returned image/mask arrays own their data and retain no source-file mappings.
 
     Args:
         path: NIfTI image filename.
@@ -43,8 +44,6 @@ def load_nifti(
         data = data[..., 0]
     if data.ndim not in (2, 3):
         raise ValueError(f"NIfTI file has unsupported ndim={data.ndim} (shape={data.shape})")
-    if dtype is not None:
-        data = data.astype(dtype, copy=False)
     unit = source.header.get_xyzt_units()[0]
     if unit not in ("mm", "meter", "micron", "unknown"):
         raise ValueError(f"Unsupported NIfTI spatial units: {unit}")
@@ -64,7 +63,11 @@ def load_nifti(
         "nifti_qform_code": int(source.header["qform_code"]),
         "nifti_sform_code": int(source.header["sform_code"]),
     }
-    volume = MedVolume(np.ascontiguousarray(data.transpose()), metadata=metadata, affine=affine)
+    # Transposing NIfTI's disk layout can already be C-contiguous, so
+    # ascontiguousarray alone retains a memmap and locks the file on Windows.
+    # Copy once, combining dtype conversion with ownership of the array.
+    image = np.array(data.transpose(), dtype=dtype, order="C", copy=True)
+    volume = MedVolume(image, metadata=metadata, affine=affine)
     if mask_path is not None:
         mask_volume = load_nifti(mask_path, dtype=None)
         assert mask_volume.affine is not None and volume.affine is not None

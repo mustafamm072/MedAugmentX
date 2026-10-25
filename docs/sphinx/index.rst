@@ -121,6 +121,7 @@ finite, non-collapsed, labels intact — and can raise, warn, revert, or retry.
    Roadmap <../MILESTONES>
    Project review <../PROJECT_REVIEW>
    Release readiness <../RELEASE_READINESS>
+   Version 1.0.0 release notes <../RELEASE_NOTES_V1>
    Contributing <../../CONTRIBUTING>
    Working on the docs <../README>
    Security policy <../../SECURITY>

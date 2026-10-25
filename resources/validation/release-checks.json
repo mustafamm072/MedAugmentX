@@ -1,28 +1,29 @@
 {
   "version": "1.0.0",
-  "base_commit": "002e3be3ecd34ef4633613101bf8c6b8783df602",
+  "base_commit": "223d1e8bba7e40aebca10c6f1cbcde69769cd017",
   "date": "2026-10-25",
-  "status": "local release candidate; no tag/publication",
+  "status": "release candidate; complete remote CI required before publication",
   "environment": {
-    "numpy": "2.4.4",
-    "scipy": "1.17.1",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
     "nibabel": "5.4.2",
     "pydicom": "3.0.2",
-    "pytest": "9.0.3",
-    "ruff": "0.15.12",
-    "mypy": "2.1.0",
+    "pytest": "9.1.1",
+    "ruff": "0.17.2",
+    "mypy": "2.4.0",
     "sphinx": "8.2.3",
-    "matplotlib": "3.11.1"
+    "matplotlib": "3.11.2"
   },
-  "python": "3.11.14 (main, Oct  9 2025, 16:16:55) [Clang 17.0.0 (clang-1700.6.3.2)]",
+  "python": "3.12.13 (main, Mar 25 2026, 03:16:06) [Clang 22.1.1 ]",
   "platform": "macOS-27.0.1-arm64-arm-64bit",
   "checks": {
     "core_suite": {
-      "passed": 719,
+      "passed": 721,
       "skipped": 1,
       "skip_reason": "optional real-framework module absent in core environment",
-      "branch_coverage_percent": 87.0907583920431,
-      "command": "python -m pytest --cov=medaugmentx --cov-branch --cov-fail-under=85"
+      "branch_coverage_percent": 87.08272859216255,
+      "command": "python -m pytest --cov=medaugmentx --cov-branch --cov-fail-under=85",
+      "python": "3.12.13"
     },
     "minimum_core": {
       "passed": 718,
@@ -32,7 +33,7 @@
       "scipy": "1.9.3",
       "nibabel": "4.0.2",
       "pydicom": "2.3.1",
-      "scope": "Final source suite on minimum dependency environment; optional framework/plotting tests skipped"
+      "scope": "Previous candidate at 223d1e8; final minimum-dependency CI must pass before publication"
     },
     "real_frameworks": {
       "passed": 19,
@@ -58,19 +59,23 @@
     "documentation": "Sphinx offline strict -W build passed",
     "distributions": "wheel/sdist build and twine check passed",
     "installed_wheel": {
-      "passed": 610,
-      "skipped": 4,
-      "python": "3.10.20",
-      "scope": "outside checkout with minimum dependencies; optional torch/viz and source-only docs checks skipped"
+      "passed": 613,
+      "skipped": 3,
+      "python": "3.12.13",
+      "scope": "Current candidate outside checkout with test/viz extras; optional frameworks and source-only docs/notebook checks skipped"
     },
     "elastic_boundary_regressions": {
       "passed": 5,
       "scope": "2D/3D constant/grid-constant fill and direct conservative box bounds; all five failed before the fix"
-    }
+    },
+    "nifti_ownership_regressions": {
+      "passed": 2,
+      "scope": "default float32 and original scaled dtype; both failed before ownership fix; Windows overwrite verified by final OS matrix"
+    },
+    "publication_gate": "release.yml refuses PyPI upload unless the exact release commit has a successful complete CI push run"
   },
   "unverified": [
     "GitHub Linux/Windows/Python matrix execution on pushed commit",
-    "minimum framework versions on CI",
     "patient/cohort model benefit",
     "vendor-specific real DICOM exports",
     "PyPI trusted-publisher configuration"

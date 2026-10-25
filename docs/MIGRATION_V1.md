@@ -22,6 +22,8 @@ anti-aliasing is enabled for images; masks always use nearest-neighbour sampling
 Active affine/elastic/flip augmentation moves anatomy on the existing grid.
 
 NIfTI loads reverse native spatial axes and convert metre/micron headers to mm.
+Loaded arrays own their data and release source-file memory mappings, including
+on Windows. Loading materializes the image and optional mask in memory.
 Image and `mask_path` must share a patient grid. Export updates sform and qform;
 shear is retained in sform with qform disabled. Unknown-grid export warns;
 set `allow_assumed_geometry=False` to require known patient geometry.

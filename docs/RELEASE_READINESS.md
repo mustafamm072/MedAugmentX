@@ -1,7 +1,7 @@
 # Version 1.0.0 release readiness
 
 This is the local release candidate prepared from review-fix commit `002e3be`.
-Version 1 freezes the documented CPU augmentation API; it does not certify
+Version 1 establishes the documented CPU augmentation API; it does not certify
 clinical realism, model benefit, universal scanner support or GPU performance.
 See [migration](MIGRATION_V1.md) before upgrading a pre-1.0 policy.
 
@@ -32,17 +32,20 @@ inversion. Five focused regression cases failed before the fix and now pass.
 
 ## Measured evidence
 
-Local checks passed on macOS arm64:
+Local checks passed on Python 3.12.13/macOS arm64. The Windows NIfTI failure
+was reproduced as an ownership regression and fixed by returning owned arrays.
+The final GitHub matrix must pass before tagging or publication:
 
-- **719 tests passed**, one optional-framework module skipped in the core env;
-  **87.09% combined line/branch coverage** (85% gate).
+- **721 tests passed**, one optional-framework module skipped in the core env;
+  **87.08% combined line/branch coverage** (85% gate).
 - **19 real framework adapter tests passed**, including spawned workers, with
   PyTorch 2.14.1, MONAI 1.6.1 and TorchIO 1.2.1.
 - Minimum NumPy 1.22.4 / SciPy 1.9.3 / nibabel 4.0.2 / pydicom 2.3.1 were
-  exercised on Python 3.10.20 (**718 passed**, two optional modules/tests skipped).
-  The installed-wheel run passed **610 tests**
-  outside the checkout; optional plotting/framework and source-only docs tests
-  skipped. This is not a local Python 3.9 or minimum-framework-version run.
+  exercised on the preceding candidate `223d1e8` on Python 3.10.20
+  (**718 passed**, two optional modules/tests skipped).
+  The current Python 3.12.13 installed-wheel run passed **613 tests** outside
+  the checkout, including plotting; optional framework and source-only docs/
+  notebook checks skipped. This is not a local Python 3.9 or minimum-framework-version run.
 - Ruff lint/format, mypy, strict offline Sphinx build, three notebooks, eight
   standalone examples, preview/JSON replay and MRI/CT CLI image/mask round trips.
 - Wheel/sdist build and Twine metadata validation; all 34 model cards are present

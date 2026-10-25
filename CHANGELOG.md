@@ -5,7 +5,7 @@ All notable changes to MedAugmentX will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [1.0.0] — prepared 2026-10-25
+## [1.0.0] — 2026-10-25
 
 ### Changed
 
@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   defaults to the physical metric. See `docs/MIGRATION_V1.md` for breaking changes.
 - Strict classic single-frame DICOM validation, regular shear support, explicit
   skip diagnostics, and opt-in PatientID retention.
+- NIfTI image/mask arrays own their data, releasing source memory mappings so
+  files can be overwritten on Windows after loading.
 - Presets disable flips by default; optional normalization, CT HU fill and
   in-plane DBT scale constraints. Explicit involutive laterality remapping.
 - Elastic boundary targets use continuous field extension independently of

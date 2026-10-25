@@ -88,3 +88,25 @@ def test_unknown_geometry_export_can_be_strict(tmp_path):
         save_nifti(
             MedVolume(np.zeros((4, 4))), str(tmp_path / "bad.nii"), allow_assumed_geometry=False
         )
+
+
+@pytest.mark.parametrize("dtype", [None, np.float32])
+def test_loaded_arrays_own_data_and_release_source_mappings(tmp_path, dtype):
+    volume = MedVolume(
+        np.arange(120, dtype=np.float32).reshape(4, 5, 6),
+        mask=np.full((4, 5, 6), 300, np.uint16),
+        affine=np.eye(4),
+    )
+    image_path, mask_path = tmp_path / "image.nii", tmp_path / "mask.nii"
+    save_nifti(volume, str(image_path), mask_path=str(mask_path))
+
+    restored = load_nifti(str(image_path), dtype=dtype, mask_path=str(mask_path))
+
+    # NIfTI disk order transposes into a C-contiguous memmap. Merely making
+    # it contiguous retains the mapping (and a Windows file lock).
+    assert restored.image.flags.owndata
+    assert restored.mask.flags.owndata
+    replacement = volume.replace(image=np.zeros_like(volume.image), mask=np.zeros_like(volume.mask))
+    save_nifti(replacement, str(image_path), mask_path=str(mask_path))
+    np.testing.assert_array_equal(restored.image, volume.image)
+    np.testing.assert_array_equal(restored.mask, volume.mask)
