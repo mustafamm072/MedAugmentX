@@ -91,6 +91,29 @@ def test_image_mask_alignment_and_source_immutability(dtype):
     np.testing.assert_array_equal(volume.mask, mask)
 
 
+@pytest.mark.parametrize(
+    "shape,axis", [((5, 3), 0), ((5, 3), 1), ((3, 5, 7), 0), ((3, 5, 7), 1), ((3, 5, 7), 2)]
+)
+@pytest.mark.parametrize("spacing", [0.6, 1.4, 2.0])
+def test_nearest_neighbor_alignment_at_half_voxel_boundaries(shape, axis, spacing):
+    image = np.indices(shape)[axis].astype(np.float32)
+    mask = image.astype(np.int16)
+    target = [1.0] * len(shape)
+    target[axis] = spacing
+    out = ResampleToSpacing(target, order=0, antialias=False)(MedVolume(image, mask))
+    np.testing.assert_array_equal(out.image, out.mask)
+
+
+@pytest.mark.parametrize("dtype,label", [(np.int64, 2**60 + 3), (np.uint64, 2**63 + 3)])
+def test_half_voxel_boundaries_keep_large_mask_ids_aligned(dtype, label):
+    image = np.repeat(np.arange(5)[:, None], 3, axis=1).astype(np.float32)
+    mask = np.zeros(image.shape, dtype=dtype)
+    mask[image == 4] = label
+    out = ResampleToSpacing((0.6, 1), order=0, antialias=False)(MedVolume(image, mask))
+    np.testing.assert_array_equal(out.image == 4, out.mask == label)
+    assert {int(value) for value in np.unique(out.mask)} == {0, label}
+
+
 def test_rounded_shape_can_stay_same_while_spacing_changes():
     volume = MedVolume(np.arange(20).reshape(4, 5), spacing=(1, 1), affine=np.eye(4))
     out = ResampleToSpacing(1.01)(volume)

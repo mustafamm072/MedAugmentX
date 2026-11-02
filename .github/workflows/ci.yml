@@ -6,9 +6,10 @@ on:
     branches: [main]
 permissions:
   contents: read
+# Keep Linux explicit: Python 3.9 binaries are unavailable on Ubuntu 26.04.
 jobs:
   quality:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,7 +26,7 @@ jobs:
       fail-fast: false
       matrix:
         python: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
-        os: [ubuntu-latest]
+        os: [ubuntu-24.04]
         include:
           - {python: '3.12', os: windows-latest}
           - {python: '3.12', os: macos-latest}
@@ -42,7 +43,7 @@ jobs:
           name: coverage-${{ matrix.python }}-${{ matrix.os }}
           path: coverage.xml
   minimum:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -52,7 +53,7 @@ jobs:
       - run: python -m pip install -e . --no-deps
       - run: python -m pytest
   frameworks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -70,7 +71,7 @@ jobs:
           python -m pip install -e '.[test]'
       - run: python -m pytest tests/interop
   package:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       MEDAUGMENTX_DOCS_OFFLINE: '1'
     steps:
@@ -96,6 +97,7 @@ jobs:
       - run: python examples/reproducible_experiment.py
       - run: python examples/preview_and_replay.py --output /tmp/medaugmentx-preview
       - run: python benchmarks/benchmark.py --shape 8 16 16 --repeats 2 --json /tmp/benchmark.json
+      - run: python benchmarks/benchmark.py --shape 16 16 --repeats 2 --json /tmp/benchmark-2d.json
       - run: python notebooks/run_notebooks.py
       - uses: actions/upload-artifact@v4
         with:

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Pin CI's Linux runner to Ubuntu 24.04, where setup-python supplies Python
+  3.9, rather than allowing ubuntu-latest to select an unsupported OS.
+- Supply spacing parameters when benchmarking `ResampleToSpacing`, cover
+  registered transforms in 2D/3D, and retain worker errors in CLI diagnostics.
+- Match image and mask nearest-neighbour sampling at half-voxel boundaries
+  while preserving exact int64/uint64 mask labels.
+
 ### Added
 
 - `ResampleToSpacing` for exact millimetre spacing with centre-aligned output

@@ -49,6 +49,8 @@ def measure(name: str, shape: tuple[int, ...], repeats: int) -> dict:
     factors = {"AnatomicCrop": 0.5, "CenterCrop": 0.5, "Resize": 0.625, "Pad": 1.5}
     if name in factors:
         kwargs["size"] = tuple(max(1, round(s * factors[name])) for s in shape)
+    if name == "ResampleToSpacing":
+        kwargs["spacing"] = tuple(s * 1.25 for s in volume.spacing)
     if name == "HistogramMatch":
         kwargs["reference_quantiles"] = np.linspace(0, 1, 256).tolist()
     transform = REGISTRY[name](**kwargs)
@@ -113,7 +115,10 @@ def main() -> None:
             "--shape",
             *map(str, args.shape),
         ]
-        result = subprocess.run(command, env=env, capture_output=True, text=True, check=True)
+        try:
+            result = subprocess.run(command, env=env, capture_output=True, text=True, check=True)
+        except subprocess.CalledProcessError as exc:
+            raise RuntimeError(f"Benchmark worker {name} failed:\n{exc.stderr}") from exc
         row = json.loads(result.stdout)
         results.append(row)
         print(f"{name:25s} median {row['median_ms']:9.2f} ms | p95 {row['p95_ms']:9.2f} ms")

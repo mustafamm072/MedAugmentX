@@ -102,10 +102,18 @@ class ResampleToSpacing(Transform):
             new_image = np.clip(new_image, volume.image.min(), volume.image.max())
         new_mask = None
         if volume.mask is not None:
-            # Direct nearest-neighbour indexing keeps even int64/uint64 IDs
-            # exact; ndimage interpolation internally converts labels to doubles.
+            # Sample axis index ramps with the same SciPy kernel as the image.
+            # NumPy rounding can disagree at half-voxel boundaries. Indexing
+            # the mask afterwards keeps int64/uint64 IDs out of floating point.
             indices = [
-                np.clip(np.floor(ratio * np.arange(size) + shift + 0.5), 0, old - 1).astype(np.intp)
+                affine_transform(
+                    np.arange(old, dtype=np.float64),
+                    np.array([[ratio]]),
+                    offset=[shift],
+                    output_shape=(size,),
+                    order=0,
+                    mode="nearest",
+                ).astype(np.intp)
                 for ratio, size, shift, old in zip(ratios, shape, offset, volume.shape)
             ]
             new_mask = volume.mask[np.ix_(*indices)]
