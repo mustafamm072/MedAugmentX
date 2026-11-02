@@ -85,6 +85,19 @@
       ],
       "validation_scope": "Synthetic numerical/property/integration tests; no clinical performance guarantee"
     },
+    "ResampleToSpacing": {
+      "input_domain": "real 2D/3D; spacing declared in millimetres",
+      "parameter_units": "target millimetres along array axes; optional output voxel limit",
+      "equation": "p = diag(new_spacing/old_spacing)*q + (old_size-1-diag(new_spacing/old_spacing)*(new_size-1))/2",
+      "assumptions": "centre-aligned sampling grid; exact requested spacing; grid directions and shear retained; nearest-edge extension; optional image antialias",
+      "limitations": "Rounded output shape changes field of view; no reorientation or registration; resampling can remove small labels; unknown patient geometry stays unknown",
+      "evidence_level": "geometric_contract",
+      "clinical_validation": false,
+      "implementation": "medaugmentx.transforms.spatial.resample",
+      "target_behavior": "maps array targets",
+      "citations": [],
+      "validation_scope": "Synthetic ramp sampling, world-coordinate invariants, mask alignment, antialias, and serialization tests; no clinical performance guarantee"
+    },
     "Pad": {
       "input_domain": "real 2D/3D",
       "parameter_units": "target voxel counts; fill in image units",

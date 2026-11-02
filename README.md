@@ -190,6 +190,30 @@ out = augment(vol)           # mask kept in sync automatically
 print(out.image.shape, out.mask.shape)
 ```
 
+### Standardize voxel spacing across scans
+
+Use `ResampleToSpacing` when the model expects a common resolution in
+millimetres. It retains the physical centre, grid directions, and shear, and
+updates masks, geometric targets, and the affine together:
+
+```python
+from medaugmentx.transforms import ResampleToSpacing, Pad, CenterCrop
+
+resample = ResampleToSpacing((1.0, 0.7, 0.7), max_voxels=32_000_000)
+out = resample(vol)                # spacing is in array order: z, y, x
+out = CenterCrop((64, 256, 256))(Pad((64, 256, 256))(out))
+```
+
+Spacing is exact; output dimensions are rounded, so the field of view can
+change slightly. `Resize` instead preserves voxel extent while choosing a
+fixed shape. Neither operation reorients scans or registers patients. The
+voxel limit can bound output size before resampling; it is not a peak-memory
+limit. Downsampling can remove small mask labels.
+
+When an affine is available, convert external RAS-mm landmarks with
+`vol.world_to_index(points)` and export them with `vol.index_to_world(points)`.
+For 2D images, off-plane world points raise explicitly.
+
 Spatial transforms use nearest-neighbour interpolation for masks, so label IDs
 are never blended. Cropping and resampling can remove small structures or whole
 classes; `Guard` can check for label loss.

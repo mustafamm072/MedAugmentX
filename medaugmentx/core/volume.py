@@ -142,6 +142,32 @@ class MedVolume:
         pts = geometry.as_keypoints(points, self.ndim)
         return pts @ self.affine[:3, : self.ndim].T + self.affine[:3, 3]
 
+    def world_to_index(self, points: object, *, tolerance_mm: float = 1e-5) -> np.ndarray:
+        """Convert finite ``(N, 3)`` RAS-mm points to continuous array indices.
+
+        Requires known patient geometry. For a 2D image, points must lie on
+        its plane within ``tolerance_mm``; off-plane points raise rather than
+        being silently projected. Indices can lie outside the image bounds
+        and are never rounded or clipped.
+
+        Args:
+            points: RAS coordinates in millimetres, including for 2D images.
+            tolerance_mm: Finite non-negative distance allowed from a 2D plane.
+        """
+        if self.affine is None:
+            raise ValueError("Patient geometry is unknown; supply an affine")
+        if not np.isfinite(tolerance_mm) or tolerance_mm < 0:
+            raise ValueError("tolerance_mm must be finite and non-negative")
+        pts = geometry.as_keypoints(points, 3)
+        basis = self.affine[:3, : self.ndim]
+        relative = pts - self.affine[:3, 3]
+        indices = np.linalg.lstsq(basis, relative.T, rcond=None)[0].T
+        if self.ndim == 2 and np.any(
+            np.linalg.norm(indices @ basis.T - relative, axis=1) > tolerance_mm
+        ):
+            raise ValueError("World points lie outside the 2D image plane")
+        return indices
+
     @staticmethod
     def _validate_targets(
         coords: np.ndarray | None,

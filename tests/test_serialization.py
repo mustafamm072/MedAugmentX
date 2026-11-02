@@ -349,6 +349,8 @@ def test_every_builtin_preserves_seed_and_draw_sequence(name, cls):
         args["transform"] = GaussianNoise()
     elif name in ("Resize", "Pad", "CenterCrop", "AnatomicCrop"):
         args["size"] = (4, 8, 8)
+    elif name == "ResampleToSpacing":
+        args["spacing"] = (1.5, 0.8, 0.8)
     original = cls(**args)
     restored = from_dict(original.to_dict())
     via_json = round_trip(original)

@@ -165,6 +165,14 @@ resize and NIfTI image/mask export. Synthetic tests include oblique/sheared grid
 spatial units, world landmarks and actual MONAI/TorchIO objects. Active anatomy
 warps retain the sampling grid. See [migration contracts](MIGRATION_V1.md).
 
+Use `ResampleToSpacing` to standardize declared voxel spacing across scans
+before augmentation. It keeps the physical centre and grid directions;
+rounding output dimensions can change the field of view slightly. Set its
+optional `max_voxels` to reject unexpectedly large outputs before resampling.
+It does not perform registration or anatomical reorientation. Use
+`MedVolume.world_to_index` for external RAS-mm landmarks; off-plane points on
+2D images are rejected. See [geometry semantics](API_REFERENCE.md#shape-versus-spacing).
+
 This support is deliberately bounded: classic monochrome single-frame DICOM,
 registered single-channel images/labels, explicit unsupported-object rejection,
 and no MONAI inverse-transform implementation. Vendor scanner fixtures and

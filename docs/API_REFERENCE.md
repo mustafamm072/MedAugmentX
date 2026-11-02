@@ -39,6 +39,12 @@ custom spatial transforms — see [Geometric targets](#geometric-targets).
 unchanged from earlier releases. The target fields were appended after it, so
 existing positional callers keep working.
 
+`volume.index_to_world(points)` maps `(N, ndim)` array coordinates to `(N, 3)`
+RAS coordinates in millimetres. `volume.world_to_index(points)` performs the
+inverse and returns continuous, unclipped array indices. Both require an
+affine. For 2D images, world points must be on the actual image plane within
+`tolerance_mm` (default `1e-5`); off-plane coordinates raise.
+
 ---
 
 ## Geometric targets
@@ -61,6 +67,7 @@ Boxes are `(M, 2*ndim)`, laid out low corner first: `[min_axis0, …, max_axis0,
 | `AnatomicCrop`, `CenterCrop` | Shift by the crop origin (may go negative) |
 | `Pad` | Shift by the pad width |
 | `Resize` | Preserve voxel extent: `(p + 0.5) * new_size / old_size - 0.5`, including singleton axes |
+| `ResampleToSpacing` | Preserve world coordinates on a centre-aligned grid with exact requested spacing; rounded dimensions can change voxel extent |
 | `SlabShift` | Translate along the slice axis |
 | `CompressionVariation` | Scale about the volume centre on the compression axis |
 | `CoarseDropout`, all intensity and artifact transforms | Unchanged (pass through) |
@@ -83,6 +90,28 @@ keypoints and clip or discard boxes, keeping labels aligned.
 (`flip_map`, `affine_map`, `translate_map`, `scale_map`, `displacement_map`) and
 the mappers (`map_keypoints`, `map_bboxes`). Build a point map, hand it to
 `MedVolume.warp` with the resampled image, and targets are carried for you.
+
+### Shape versus spacing
+
+`Resize(size)` preserves the full voxel extent and derives the spacing from the
+requested shape. `ResampleToSpacing(spacing)` sets exact millimetres along each
+existing grid axis, preserving grid directions, shear and the physical centre.
+Its output size on each axis is `max(1, floor(old_size * old_spacing /
+new_spacing + 0.5))`. Integer rounding changes the voxel extent by at most half
+an output voxel per axis, except when a minimum dimension of one is required.
+It does not reorient scans, remove shear or register images.
+
+The image uses configurable spline interpolation with optional antialiasing
+before downsampling; the mask always uses nearest-neighbour without smoothing.
+Both use nearest-edge extension at boundaries. `clip_output=True` clamps spline
+overshoot. Output images are float32; masks retain their dtype. Landmarks and
+boxes are mapped continuously and never implicitly clipped or dropped. Unknown
+patient geometry stays unknown; declared spacing still determines resampling.
+
+Output shapes depend on input spacing and dimensions. Use `Pad` and `CenterCrop`
+afterwards when batching requires a fixed shape. `max_voxels` optionally rejects
+an oversized output before interpolation or smoothing; it bounds the output
+voxel count, not peak working memory. This setting is saved in policy JSON/YAML.
 
 ---
 

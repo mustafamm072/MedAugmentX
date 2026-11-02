@@ -5,6 +5,17 @@ All notable changes to MedAugmentX will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- `ResampleToSpacing` for exact millimetre spacing with centre-aligned output
+  grids, image antialiasing, nearest-neighbour masks, coherent patient geometry
+  and geometric targets, JSON/YAML and replay support, and an optional output
+  voxel limit checked before allocation. Adds no required dependencies.
+- `MedVolume.world_to_index` to import RAS-mm landmarks as continuous array
+  indices, including explicit off-plane rejection for 2D images.
+
 ## [1.0.0] — 2026-10-25
 
 ### Changed

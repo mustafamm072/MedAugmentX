@@ -4,5 +4,6 @@ from medaugmentx.transforms.spatial.affine import RandomAffine
 from medaugmentx.transforms.spatial.crop import AnatomicCrop
 from medaugmentx.transforms.spatial.elastic import ElasticDeform
 from medaugmentx.transforms.spatial.flip import RandomFlip
+from medaugmentx.transforms.spatial.resample import ResampleToSpacing
 
-__all__ = ["RandomAffine", "RandomFlip", "AnatomicCrop", "ElasticDeform"]
+__all__ = ["RandomAffine", "RandomFlip", "AnatomicCrop", "ElasticDeform", "ResampleToSpacing"]

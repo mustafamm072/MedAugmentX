@@ -113,6 +113,7 @@ def test_targets_column_matches_documented_behaviour():
         "CenterCrop",
         "Pad",
         "Resize",
+        "ResampleToSpacing",
         "SlabShift",
         "CompressionVariation",
     }

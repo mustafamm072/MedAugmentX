@@ -36,6 +36,7 @@ from medaugmentx.transforms.spatial.crop import AnatomicCrop
 from medaugmentx.transforms.spatial.dropout import CoarseDropout
 from medaugmentx.transforms.spatial.elastic import ElasticDeform
 from medaugmentx.transforms.spatial.flip import RandomFlip
+from medaugmentx.transforms.spatial.resample import ResampleToSpacing
 from medaugmentx.transforms.spatial.resize import CenterCrop, Pad, Resize
 
 __all__ = [
@@ -46,6 +47,7 @@ __all__ = [
     "ElasticDeform",
     "CoarseDropout",
     "Resize",
+    "ResampleToSpacing",
     "Pad",
     "CenterCrop",
     # Intensity
