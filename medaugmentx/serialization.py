@@ -62,11 +62,11 @@ def _register_builtins() -> None:
 
     # Spatial
     from medaugmentx.transforms.spatial.affine import RandomAffine
-    from medaugmentx.transforms.spatial.crop import AnatomicCrop
+    from medaugmentx.transforms.spatial.crop import AnatomicCrop, ClassBalancedCrop
     from medaugmentx.transforms.spatial.dropout import CoarseDropout
     from medaugmentx.transforms.spatial.elastic import ElasticDeform
     from medaugmentx.transforms.spatial.flip import RandomFlip
-    from medaugmentx.transforms.spatial.resample import ResampleToSpacing
+    from medaugmentx.transforms.spatial.resample import ResampleToGrid, ResampleToSpacing
     from medaugmentx.transforms.spatial.resize import CenterCrop, Pad, Resize
 
     REGISTRY.update(
@@ -74,10 +74,12 @@ def _register_builtins() -> None:
             "RandomAffine": RandomAffine,
             "RandomFlip": RandomFlip,
             "AnatomicCrop": AnatomicCrop,
+            "ClassBalancedCrop": ClassBalancedCrop,
             "ElasticDeform": ElasticDeform,
             "CoarseDropout": CoarseDropout,
             "Resize": Resize,
             "ResampleToSpacing": ResampleToSpacing,
+            "ResampleToGrid": ResampleToGrid,
             "Pad": Pad,
             "CenterCrop": CenterCrop,
         }

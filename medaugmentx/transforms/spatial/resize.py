@@ -20,8 +20,9 @@ from medaugmentx.core import geometry
 from medaugmentx.core.base import Transform
 from medaugmentx.core.parameters import validate_parameters
 from medaugmentx.core.physical import grid_translation
-from medaugmentx.core.utils import SeedLike, as_float32
+from medaugmentx.core.utils import SeedLike, as_float32, sample_mask
 from medaugmentx.core.volume import MedVolume
+from medaugmentx.transforms.spatial.crop import _crop
 
 
 class Resize(Transform):
@@ -70,19 +71,23 @@ class Resize(Transform):
             return volume
 
         factors = [t / s for t, s in zip(self.size, old_shape)]
-        image = as_float32(volume.image)
-        if self.antialias and any(f < 1 for f in factors):
-            image = gaussian_filter(image, sigma=[max(0.0, (1 / f - 1) / 2) for f in factors])
-        new_image = zoom(image, factors, order=self.order, mode="reflect", grid_mode=True)
-        if self.clip_output:
-            new_image = np.clip(new_image, volume.image.min(), volume.image.max())
-        # zoom can be off-by-one on rounding; force exact target shape.
-        new_image = _force_shape(new_image, self.size, fill=0.0)
+
+        def resize_image(array: np.ndarray) -> np.ndarray:
+            image = as_float32(array)
+            if self.antialias and any(f < 1 for f in factors):
+                image = gaussian_filter(image, sigma=[max(0.0, (1 / f - 1) / 2) for f in factors])
+            resized = zoom(image, factors, order=self.order, mode="reflect", grid_mode=True)
+            if self.clip_output:
+                resized = np.clip(resized, array.min(), array.max())
+            # zoom can be off-by-one on rounding; force exact target shape.
+            return _force_shape(resized, self.size, fill=0.0).astype(np.float32, copy=False)
 
         new_mask = None
         if volume.mask is not None:
-            m = zoom(volume.mask, factors, order=0, mode="nearest", grid_mode=True)
-            new_mask = _force_shape(m, self.size, fill=0).astype(volume.mask.dtype, copy=False)
+            new_mask = sample_mask(
+                volume.mask, lambda arr: zoom(arr, factors, order=0, mode="nearest", grid_mode=True)
+            )
+            new_mask = _force_shape(new_mask, self.size, fill=0)
 
         new_spacing = tuple(sp * o / t for sp, o, t in zip(volume.spacing, old_shape, self.size))
         # Preserve full voxel extent. Output centre q samples input
@@ -98,7 +103,7 @@ class Resize(Transform):
             pull[ax, 3] = (1 / factor - 1) / 2
         return volume.warp(
             point_map,
-            image=new_image.astype(np.float32, copy=False),
+            image_map=resize_image,
             mask=new_mask,
             spacing=new_spacing,
             grid_map=pull,
@@ -167,11 +172,11 @@ class Pad(Transform):
         if all(b == 0 and a == 0 for b, a in widths):
             return volume
 
-        image = as_float32(volume.image)
-        if self.mode == "constant":
-            new_image = np.pad(image, widths, mode="constant", constant_values=self.cval)
-        else:
-            new_image = np.pad(image, widths, mode=self.mode)  # type: ignore[call-overload]
+        def pad_image(array: np.ndarray) -> np.ndarray:
+            image = as_float32(array)
+            if self.mode == "constant":
+                return np.pad(image, widths, mode="constant", constant_values=self.cval)
+            return np.pad(image, widths, mode=self.mode)  # type: ignore[call-overload]
 
         new_mask = None
         if volume.mask is not None:
@@ -181,7 +186,7 @@ class Pad(Transform):
         point_map = geometry.translate_map(before)
         return volume.warp(
             point_map,
-            image=new_image.astype(np.float32, copy=False),
+            image_map=pad_image,
             mask=new_mask,
             grid_map=grid_translation(-before),
         )
@@ -228,20 +233,9 @@ class CenterCrop(Transform):
             raise ValueError(
                 f"size ndim ({len(self.size)}) does not match volume ndim ({volume.ndim})"
             )
-        slices = []
-        starts = []
-        for target, cur in zip(self.size, volume.shape):
-            crop = min(target, cur)
-            start = (cur - crop) // 2
-            starts.append(start)
-            slices.append(slice(start, start + crop))
-        region = tuple(slices)
-        new_image = volume.image[region].copy()
-        new_mask = None if volume.mask is None else volume.mask[region].copy()
-        point_map = geometry.translate_map(-np.asarray(starts, dtype=np.float64))
-        return volume.warp(
-            point_map, image=new_image, mask=new_mask, grid_map=grid_translation(starts)
-        )
+        size = tuple(min(target, current) for target, current in zip(self.size, volume.shape))
+        origin = tuple((current - width) // 2 for current, width in zip(volume.shape, size))
+        return _crop(volume, origin, size)
 
     def to_dict(self) -> dict[str, Any]:
         return {

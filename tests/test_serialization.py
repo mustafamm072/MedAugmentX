@@ -201,6 +201,8 @@ def test_registry_contains_all_known_transforms():
         "RandomAffine",
         "RandomFlip",
         "AnatomicCrop",
+        "ClassBalancedCrop",
+        "ResampleToGrid",
         "ElasticDeform",
         "CoarseDropout",
         "Resize",
@@ -347,14 +349,20 @@ def test_every_builtin_preserves_seed_and_draw_sequence(name, cls):
         args["transforms"] = [GaussianNoise()]
     elif name == "Guard":
         args["transform"] = GaussianNoise()
-    elif name in ("Resize", "Pad", "CenterCrop", "AnatomicCrop"):
+    elif name in ("Resize", "Pad", "CenterCrop", "AnatomicCrop", "ClassBalancedCrop"):
         args["size"] = (4, 8, 8)
     elif name == "ResampleToSpacing":
         args["spacing"] = (1.5, 0.8, 0.8)
+    elif name == "ResampleToGrid":
+        args["shape"] = (3, 6, 7)
+        args["affine"] = np.diag([2, 1, 1, 1])
     original = cls(**args)
     restored = from_dict(original.to_dict())
     via_json = round_trip(original)
-    volume = MedVolume(np.random.default_rng(0).random((4, 8, 8)).astype(np.float32))
+    volume = MedVolume(
+        np.random.default_rng(0).random((4, 8, 8)).astype(np.float32),
+        affine=np.eye(4) if name == "ResampleToGrid" else None,
+    )
     assert restored.to_dict()["params"]["seed"] == 17
     for _ in range(3):
         expected = original(volume).image

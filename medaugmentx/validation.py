@@ -211,6 +211,9 @@ class VolumeValidator:
     def validate(self, volume: MedVolume, reference: MedVolume | None = None) -> ValidationReport:
         """Run all enabled checks and return a :class:`ValidationReport`.
 
+        The structure and finite-value checks cover every channel. Intensity
+        range, constant-image, and intensity-drift rules use the primary image.
+
         Args:
             volume: The (augmented) volume to inspect.
             reference: Optional pre-augmentation volume. Comparative rules are
@@ -275,6 +278,22 @@ class VolumeValidator:
                 )
             )
 
+        for name, channel in volume.channels.items():
+            if (
+                not isinstance(channel, np.ndarray)
+                or channel.shape != image.shape
+                or channel.dtype.kind not in "buif"
+            ):
+                issues.append(
+                    ValidationIssue("channel_structure", "error", f"Invalid image channel {name!r}")
+                )
+            elif self.require_finite and not np.isfinite(channel).all():
+                issues.append(
+                    ValidationIssue(
+                        "finite", "error", f"Channel {name!r} contains non-finite values"
+                    )
+                )
+
         # A constant image is only diagnosable when the values are finite.
         if self.forbid_constant and np.all(np.isfinite(image)) and image.size > 0:
             if float(np.max(image)) == float(np.min(image)):
@@ -325,6 +344,10 @@ class VolumeValidator:
         if reference is not None:
             if not isinstance(reference, MedVolume):
                 raise TypeError("reference must be a MedVolume")
+            if tuple(reference.channels) != tuple(volume.channels):
+                issues.append(
+                    ValidationIssue("channel_structure", "error", "Channel names or order changed")
+                )
             if not any(
                 i.check in ("geometry", "mask_values", "mask_shape") and i.severity == "error"
                 for i in issues

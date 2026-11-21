@@ -110,10 +110,12 @@ def test_targets_column_matches_documented_behaviour():
         "ElasticDeform",
         "AnisotropicElastic",
         "AnatomicCrop",
+        "ClassBalancedCrop",
         "CenterCrop",
         "Pad",
         "Resize",
         "ResampleToSpacing",
+        "ResampleToGrid",
         "SlabShift",
         "CompressionVariation",
     }

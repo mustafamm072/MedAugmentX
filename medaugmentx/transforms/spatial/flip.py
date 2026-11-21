@@ -99,10 +99,11 @@ class RandomFlip(Transform):
         if not flips:
             return volume
         flip_axes = tuple(flips)
-        new_image = np.flip(volume.image, axis=flip_axes).copy()
         new_mask = None if volume.mask is None else np.flip(volume.mask, axis=flip_axes).copy()
         point_map = geometry.flip_map(flip_axes, volume.shape)
-        out = volume.warp(point_map, image=new_image, mask=new_mask)
+        out = volume.warp(
+            point_map, image_map=lambda array: np.flip(array, axis=flip_axes).copy(), mask=new_mask
+        )
         if axis_label_to_index(self.label_axis, volume.ndim) in flip_axes:
             if new_mask is not None and self.label_map is not None:
                 info = np.iinfo(new_mask.dtype) if new_mask.dtype.kind in "iu" else None

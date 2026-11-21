@@ -11,7 +11,7 @@ from scipy.ndimage import gaussian_filter, map_coordinates
 from medaugmentx.core import geometry
 from medaugmentx.core.base import Transform
 from medaugmentx.core.parameters import validate_parameters
-from medaugmentx.core.utils import SeedLike, as_float32
+from medaugmentx.core.utils import SeedLike, as_float32, sample_mask
 from medaugmentx.core.volume import MedVolume
 
 ScalarOrSeq = Union[float, Sequence[float]]
@@ -149,29 +149,17 @@ class ElasticDeform(Transform):
         coords = [g + d for g, d in zip(grid, displacements)]
         coord_stack = np.stack([c.ravel() for c in coords], axis=0)
 
-        image = as_float32(volume.image)
-        warped = map_coordinates(
-            image,
-            coord_stack,
-            order=self.order,
-            mode=self.mode,
-            cval=self.cval,
-        ).reshape(shape)
+        def warp_image(array: np.ndarray) -> np.ndarray:
+            return map_coordinates(
+                as_float32(array), coord_stack, order=self.order, mode=self.mode, cval=self.cval
+            ).reshape(shape)
 
         new_mask = None
         if volume.mask is not None:
-            warped_mask = (
-                map_coordinates(
-                    volume.mask,
-                    coord_stack,
-                    order=0,
-                    mode=self.mode,
-                    cval=0,
-                )
-                .reshape(shape)
-                .astype(volume.mask.dtype, copy=False)
-            )
-            new_mask = warped_mask
+            new_mask = sample_mask(
+                volume.mask,
+                lambda arr: map_coordinates(arr, coord_stack, order=0, mode=self.mode, cval=0),
+            ).reshape(shape)
         # Image fill is not a displacement-field boundary condition: zeroing
         # d outside the grid makes inverse iteration discontinuous at the edge.
         target_mode = "nearest" if self.mode in ("constant", "grid-constant") else self.mode
@@ -181,8 +169,10 @@ class ElasticDeform(Transform):
             # every mapped interior point, including extrema away from corners.
             low = np.asarray([min(0.0, float(f.min())) for f in displacements])
             high = np.asarray([max(0.0, float(f.max())) for f in displacements])
+            image, channels = volume._map_images(warp_image)
             return volume.replace(
-                image=warped,
+                image=image,
+                channels=channels,
                 mask=new_mask,
                 keypoints=None
                 if volume.keypoints is None
@@ -192,7 +182,7 @@ class ElasticDeform(Transform):
                     axis=1,
                 ),
             )
-        return volume.warp(point_map, image=warped, mask=new_mask)
+        return volume.warp(point_map, image_map=warp_image, mask=new_mask)
 
     def to_dict(self) -> dict[str, Any]:
         alpha = (

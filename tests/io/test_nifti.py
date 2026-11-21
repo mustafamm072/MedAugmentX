@@ -110,3 +110,102 @@ def test_loaded_arrays_own_data_and_release_source_mappings(tmp_path, dtype):
     save_nifti(replacement, str(image_path), mask_path=str(mask_path))
     np.testing.assert_array_equal(restored.image, volume.image)
     np.testing.assert_array_equal(restored.mask, volume.mask)
+
+
+def test_opt_in_mask_resampling_preserves_uint64_labels_on_image_grid(tmp_path):
+    affine = np.array([[0.1, 0, -0.7, 80], [0, 1.2, 0.1, -20], [2, 0, 0, 7], [0, 0, 0, 1]])
+    image = MedVolume(np.zeros((3, 4, 5), dtype=np.float32), affine=affine)
+    image_path, mask_path = tmp_path / "image.nii", tmp_path / "mask.nii.gz"
+    save_nifti(image, str(image_path))
+    mask_affine = affine.copy()
+    mask_affine[:3, 3] += affine[:3, :3].sum(axis=1)
+    labels = np.full((2, 3, 4), 2**63 + 1, dtype=np.uint64)
+    labels[0, 1, 2] = 2**64 - 1
+    save_nifti(MedVolume(labels, affine=mask_affine), str(mask_path))
+
+    with pytest.raises(ValueError, match="patient-space grid"):
+        load_nifti(str(image_path), mask_path=str(mask_path))
+    output = load_nifti(str(image_path), mask_path=str(mask_path), resample_mask=True)
+    expected = np.zeros(image.shape, dtype=labels.dtype)
+    expected[1:, 1:, 1:] = labels
+    np.testing.assert_array_equal(output.mask, expected)
+    assert output.mask.dtype == labels.dtype
+    np.testing.assert_array_equal(output.affine, load_nifti(str(image_path)).affine)
+
+
+def test_strict_grid_match_uses_absolute_patient_distance(tmp_path):
+    image_path, mask_path = tmp_path / "image.nii", tmp_path / "mask.nii"
+    affine = np.eye(4)
+    affine[0, 3] = 2000
+    save_nifti(MedVolume(np.zeros((3, 4)), affine=affine), str(image_path))
+    affine[0, 3] += 0.015
+    save_nifti(MedVolume(np.zeros((3, 4)), affine=affine), str(mask_path))
+    with pytest.raises(ValueError, match="patient-space grid"):
+        load_nifti(str(image_path), mask_path=str(mask_path))
+
+
+@pytest.mark.parametrize(
+    "labels, shift, match",
+    [
+        (np.ones((2, 2, 2), dtype=np.uint8), 10, "removed all nonzero"),
+        (np.full((2, 2, 2), 0.5, dtype=np.float32), 10, "integer-valued"),
+    ],
+)
+def test_mask_resampling_rejects_total_label_loss_and_invalid_labels(
+    tmp_path, labels, shift, match
+):
+    image_path, mask_path = tmp_path / "image.nii", tmp_path / "mask.nii"
+    save_nifti(MedVolume(np.zeros((4, 4, 4)), affine=np.eye(4)), str(image_path))
+    affine = np.eye(4)
+    affine[0, 3] = shift
+    save_nifti(MedVolume(labels, affine=affine), str(mask_path))
+    with pytest.raises(ValueError, match=match):
+        load_nifti(str(image_path), mask_path=str(mask_path), resample_mask=True)
+
+
+def test_opt_in_mask_alignment_requires_coded_geometry_and_matching_ndim(tmp_path):
+    image_path, mask_path = tmp_path / "image.nii", tmp_path / "mask.nii"
+    save_nifti(MedVolume(np.zeros((4, 4, 4)), affine=np.eye(4)), str(image_path))
+    mask = nibabel.Nifti1Image(np.zeros((3, 3, 3), dtype=np.uint8), None)
+    mask.header.set_xyzt_units("mm")
+    nibabel.save(mask, mask_path)
+    with pytest.raises(ValueError, match="coded qform or sform"):
+        load_nifti(str(image_path), mask_path=str(mask_path), resample_mask=True)
+    save_nifti(MedVolume(np.zeros((4, 4)), affine=np.eye(4)), str(mask_path))
+    with pytest.raises(ValueError, match="dimensionality"):
+        load_nifti(str(image_path), mask_path=str(mask_path), resample_mask=True)
+
+
+def test_mask_resampling_requires_a_mask_path():
+    with pytest.raises(ValueError, match="requires mask_path"):
+        load_nifti("unused.nii", resample_mask=True)
+
+
+def test_nifti_exports_wide_nonnegative_float_labels_as_uint64(tmp_path):
+    image_path, mask_path = tmp_path / "image.nii", tmp_path / "mask.nii"
+    integer_labels = np.array([[0, 2**63], [1, 2**63 + 2**16]], dtype=np.uint64)
+    volume = MedVolume(np.zeros((2, 2)), integer_labels.astype(np.float64), affine=np.eye(4))
+    save_nifti(volume, str(image_path), mask_path=str(mask_path))
+    output = load_nifti(str(image_path), mask_path=str(mask_path))
+    assert output.mask.dtype == np.uint64
+    np.testing.assert_array_equal(output.mask, integer_labels)
+
+
+def test_nifti_explicit_channel_selection_prevents_silent_channel_loss(tmp_path):
+    image_path = tmp_path / "selected.nii"
+    volume = MedVolume(np.zeros((2, 2)), affine=np.eye(4), channels={"flair": np.ones((2, 2))})
+    with pytest.raises(ValueError, match="select_channel"):
+        save_nifti(volume, str(image_path))
+    assert not image_path.exists()
+    save_nifti(volume.select_channel("flair"), str(image_path))
+    np.testing.assert_array_equal(load_nifti(str(image_path)).image, np.ones((2, 2)))
+
+
+@pytest.mark.parametrize("labels", [[0, 2.0**64], [-1, 2.0**63], [0, -(2.0**64)]])
+def test_nifti_rejects_unrepresentable_float_labels_before_writing(tmp_path, labels):
+    image_path, mask_path = tmp_path / "image.nii", tmp_path / "mask.nii"
+    volume = MedVolume(np.zeros((2, 2)), np.tile(labels, (2, 1)), affine=np.eye(4))
+    with pytest.raises(ValueError, match="lossless export"):
+        save_nifti(volume, str(image_path), mask_path=str(mask_path))
+    assert not image_path.exists()
+    assert not mask_path.exists()

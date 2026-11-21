@@ -230,7 +230,10 @@ class SampleTransform:
             spacing,
             {} if metadata is None else dict(metadata),
             affine=affine,
-            **target_values,
+            keypoints=target_values.get("keypoints"),
+            keypoint_labels=target_values.get("keypoint_labels"),
+            bboxes=target_values.get("bboxes"),
+            bbox_labels=target_values.get("bbox_labels"),
         )
         augmented = self.transform(volume)
         output_affine = augmented.affine

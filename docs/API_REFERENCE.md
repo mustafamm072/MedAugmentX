@@ -65,9 +65,11 @@ Boxes are `(M, 2*ndim)`, laid out low corner first: `[min_axis0, …, max_axis0,
 | `RandomAffine` | Forward affine map about the volume centre, plus translation |
 | `ElasticDeform`, `AnisotropicElastic` | Iteratively invert the pixel pull field at each point; raise if inversion does not converge |
 | `AnatomicCrop`, `CenterCrop` | Shift by the crop origin (may go negative) |
+| `ClassBalancedCrop` | Shift by the patch origin, accounting for any padding |
 | `Pad` | Shift by the pad width |
 | `Resize` | Preserve voxel extent: `(p + 0.5) * new_size / old_size - 0.5`, including singleton axes |
 | `ResampleToSpacing` | Preserve world coordinates on a centre-aligned grid with exact requested spacing; rounded dimensions can change voxel extent |
+| `ResampleToGrid` | Move targets into an explicit reference grid while preserving patient coordinates |
 | `SlabShift` | Translate along the slice axis |
 | `CompressionVariation` | Scale about the volume centre on the compression axis |
 | `CoarseDropout`, all intensity and artifact transforms | Unchanged (pass through) |
@@ -112,6 +114,63 @@ Output shapes depend on input spacing and dimensions. Use `Pad` and `CenterCrop`
 afterwards when batching requires a fixed shape. `max_voxels` optionally rejects
 an oversized output before interpolation or smoothing; it bounds the output
 voxel count, not peak working memory. This setting is saved in policy JSON/YAML.
+
+### Matching a reference grid
+
+Use `ResampleToGrid(reference.shape, reference.affine, cval=...)` when the output
+must use a specific shape, origin, spacing and orientation. The source and
+reference must already share the same patient coordinate system. In 2D,
+the target grid must lie in the source plane within `1e-4` mm across its
+field of view.
+
+The image uses spline interpolation against `cval` outside the source field.
+The mask uses nearest-neighbour with label `0` outside the source voxel extent.
+Put categorical IDs in the mask rather than the image to preserve their
+dtype and exact values. Images are sampled in float32, and grid downsampling
+applies no antialiasing. When returning predictions to a native grid, the
+target affine restores their spatial frame and shape. Interpolation cannot
+recover values discarded earlier by cropping or downsampling.
+
+### Fixed-size training patches
+
+`ClassBalancedCrop(size, foreground_prob=0.5, labels=None)` returns one patch
+per applied call. The foreground branch samples a class uniformly from the
+eligible nonzero labels present in the mask. It samples a voxel uniformly from
+that class, then samples an origin uniformly among origins that include the
+voxel. A missing mask, a missing eligible class, or the alternate probability
+branch yields an unrestricted spatially uniform origin. Use `labels` to
+exclude ignore IDs. A patch may also contain other classes.
+
+Use `p=1` to guarantee the requested shape. Short axes retain every original
+voxel and split the extra padding across both sides, with an odd extra voxel
+at the high end. Padded images use float32 and `cval` in the current intensity
+units. Masks retain their dtype and use label `0` for padding. Spacing and
+patient coordinates are preserved. For detection, call
+`remove_out_of_bounds_targets` after patch extraction if your task needs target
+pruning or clipping.
+
+### Synchronized image channels
+
+`MedVolume.with_channels({"flair": flair_volume})` verifies equal shape and a
+known, matching patient grid. To attach arrays already checked by your loader,
+pass `channels={"flair": flair_array}` when constructing the primary volume.
+The primary image determines spacing, geometry, and the associated mask and
+targets. Channel names are preserved through the policy. `stack_channels()`
+puts the primary image first, then the additional names in insertion order.
+Pass the names explicitly to select channels and pin their order.
+
+Spatial transforms and coarse or slice dropout share one set of sampled
+parameters for all images. Intensity and appearance transforms operate on the
+primary image. Apply separate intensity policies to each loaded image before
+joining it. A spatial transform's image padding or fill is shared across
+channels, so choose it for their common intensity scale. A custom spatial
+transform can pass `image_map=` to `MedVolume.warp` to reuse one sampled mapping.
+
+Named channels flow through `Compose`, `Guard`, per-sample seeding, and replay.
+The existing tensor and dictionary adapters still accept single-channel image
+fields. Construct a `MedVolume` directly for synchronized channels and stack
+its output for the model. Use `select_channel("flair")` or `select_channel()`
+to export a single image via NIfTI.
 
 ---
 
@@ -174,7 +233,7 @@ kind they were given:
 | Mapping with `image_key` and optional `mask_key` | Shallow-copied mapping |
 | TorchIO `Subject` | `Subject`, with augmented data written back |
 
-MedAugmentX operates on single-channel 2D and 3D data. `channel_dim` — `None`,
+The framework adapters accept single-channel 2D and 3D image fields. `channel_dim` — `None`,
 `"auto"`, `"first"`, `"last"`, or an integer axis — says where the adapter
 should expect a singleton channel dimension; it is stripped before augmentation
 and restored afterwards.

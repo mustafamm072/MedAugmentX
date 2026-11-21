@@ -95,6 +95,7 @@ jobs:
       - run: python -m sphinx -W --keep-going -b html -c docs/sphinx . /tmp/medaugmentx-docs
       - run: python examples/quickstart.py
       - run: python examples/reproducible_experiment.py
+      - run: python examples/compare_segmentation_policies.py
       - run: python examples/preview_and_replay.py --output /tmp/medaugmentx-preview
       - run: python benchmarks/benchmark.py --shape 8 16 16 --repeats 2 --json /tmp/benchmark.json
       - run: python benchmarks/benchmark.py --shape 16 16 --repeats 2 --json /tmp/benchmark-2d.json

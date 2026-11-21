@@ -10,7 +10,7 @@ from scipy.ndimage import affine_transform
 from medaugmentx.core import geometry
 from medaugmentx.core.base import Transform
 from medaugmentx.core.parameters import checked_range, validate_parameters
-from medaugmentx.core.utils import SeedLike, as_float32
+from medaugmentx.core.utils import SeedLike, as_float32, sample_mask
 from medaugmentx.core.volume import MedVolume
 
 Range = Union[float, tuple[float, float]]
@@ -200,31 +200,35 @@ class RandomAffine(Transform):
         matrix = np.linalg.inv(forward)
         offset = centre - matrix @ (centre + translation_px)
 
-        image = as_float32(volume.image)
-        new_image = affine_transform(
-            image,
-            matrix=matrix,
-            offset=offset,
-            order=self.order,
-            mode=self.mode,
-            cval=self.cval,
-            output_shape=image.shape,
-            prefilter=self.order > 1,
-        )
-        new_mask = None
-        if volume.mask is not None:
-            new_mask = affine_transform(
-                volume.mask,
+        def warp_image(array: np.ndarray) -> np.ndarray:
+            return affine_transform(
+                as_float32(array),
                 matrix=matrix,
                 offset=offset,
-                order=0,
+                order=self.order,
                 mode=self.mode,
-                cval=0,
-                output_shape=volume.mask.shape,
-                prefilter=False,
-            ).astype(volume.mask.dtype, copy=False)
+                cval=self.cval,
+                output_shape=array.shape,
+                prefilter=self.order > 1,
+            )
+
+        new_mask = None
+        if volume.mask is not None:
+            new_mask = sample_mask(
+                volume.mask,
+                lambda arr: affine_transform(
+                    arr,
+                    matrix=matrix,
+                    offset=offset,
+                    order=0,
+                    mode=self.mode,
+                    cval=0,
+                    output_shape=arr.shape,
+                    prefilter=False,
+                ),
+            )
         point_map = geometry.affine_map(forward, centre, translation_px)
-        return volume.warp(point_map, image=new_image, mask=new_mask)
+        return volume.warp(point_map, image_map=warp_image, mask=new_mask)
 
     def to_dict(self) -> dict[str, Any]:
         return {

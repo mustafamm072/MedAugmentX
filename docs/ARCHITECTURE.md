@@ -140,7 +140,7 @@ Subdivided by *what* changes about the image:
 
 | Folder | Changes | Contents |
 | --- | --- | --- |
-| `spatial/` | Geometry — pixels move | `RandomAffine`, `RandomFlip`, `AnatomicCrop`, `ElasticDeform`, `CoarseDropout`, `Resize`, `Pad`, `CenterCrop` |
+| `spatial/` | Geometry — pixels move | `RandomAffine`, `RandomFlip`, `AnatomicCrop`, `ClassBalancedCrop`, `ElasticDeform`, `CoarseDropout`, `Resize`, `ResampleToSpacing`, `ResampleToGrid`, `Pad`, `CenterCrop` |
 | `intensity/` | Per-pixel value, geometry preserved | `GaussianNoise`, `RicianNoise`, `GammaCorrection`, `BiasField`, `WindowLevel`, `BrightnessContrast`, `GaussianBlur`, `MedianBlur`, `SimulateLowResolution`, `Sharpen`, `CLAHEContrast`, `HistogramMatch` |
 | `modality/mri/` | MRI-specific artifacts | `GhostingArtifact`, `KSpaceDropout`, `MRIMotion` |
 | `modality/ct/` | CT-specific artifacts | `BeamHardening`, `MetalStreak` |
@@ -255,7 +255,9 @@ Import rule: `medaugmentx.interop` must not import PyTorch, MONAI, or TorchIO
 at module import time. Tensor and subject support is duck-typed and restores
 framework objects only when those objects are actually passed.
 
-Channel rule: MedAugmentX transforms operate on single-channel 2D/3D images.
+Channel rule: adapters accept single-channel 2D/3D image fields. For several
+registered images, construct a `MedVolume` with named channels and use
+`stack_channels` after augmentation.
 Adapters may strip one singleton channel axis before augmentation and restore
 it after augmentation.
 

@@ -72,7 +72,6 @@ class SlabShift(Transform):
         shift = int(self.rng.integers(self.shift_range[0], self.shift_range[1] + 1))
         if shift == 0:
             return volume
-        new_image = self._shift_array(volume.image, shift, self.cval)
         new_mask = (
             None
             if volume.mask is None
@@ -80,7 +79,7 @@ class SlabShift(Transform):
         )
         return volume.warp(
             geometry.translate_map(np.array([shift, 0.0, 0.0])),
-            image=new_image,
+            image_map=lambda array: self._shift_array(array, shift, self.cval),
             mask=new_mask,
         )
 

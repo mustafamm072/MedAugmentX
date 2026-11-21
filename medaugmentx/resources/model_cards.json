@@ -42,6 +42,19 @@
       "citations": [],
       "validation_scope": "Synthetic numerical/property/integration tests; no clinical performance guarantee"
     },
+    "ClassBalancedCrop": {
+      "input_domain": "real 2D/3D; optional registered integer-valued mask",
+      "parameter_units": "patch size in voxels; image padding in current intensity units; mask padding is 0",
+      "equation": "q = p - patch_origin; choose an eligible present class uniformly, then an anchor voxel within that class uniformly",
+      "assumptions": "zero is background; short axes are padded symmetrically; uniform origins when the class branch is skipped or unavailable",
+      "limitations": "Anchor balance is per scan and does not establish dataset class balance, minimum lesion coverage, or improved model performance",
+      "evidence_level": "geometric_contract",
+      "clinical_validation": false,
+      "implementation": "medaugmentx.transforms.spatial.crop",
+      "target_behavior": "maps array targets and updates the sampling grid",
+      "citations": [],
+      "validation_scope": "Synthetic class-frequency, padding, geometry, mask-label, and replay tests"
+    },
     "ElasticDeform": {
       "input_domain": "real 2D/3D; integer labels",
       "parameter_units": "alpha/sigma/cap in voxels or mm along grid axes",
@@ -97,6 +110,19 @@
       "target_behavior": "maps array targets",
       "citations": [],
       "validation_scope": "Synthetic ramp sampling, world-coordinate invariants, mask alignment, antialias, and serialization tests; no clinical performance guarantee"
+    },
+    "ResampleToGrid": {
+      "input_domain": "registered real 2D/3D; source and target array-to-RAS-mm affines; coplanar 2D grids",
+      "parameter_units": "target shape in voxels; affine in RAS millimetres; fill in image units",
+      "equation": "p = inverse(source_affine) * target_affine * q in 3D; solve within the source plane in 2D",
+      "assumptions": "affines share a patient frame; image spline interpolation; order-zero categorical masks with zero fill",
+      "limitations": "No registration or antialiasing; interpolation can affect intensities and remove small labels",
+      "evidence_level": "geometric_contract",
+      "clinical_validation": false,
+      "implementation": "medaugmentx.transforms.spatial.resample",
+      "target_behavior": "maps array targets to the target grid while preserving physical landmark positions",
+      "citations": [],
+      "validation_scope": "Synthetic tests of translated, permuted, reflected, sheared and coplanar grids; exact labels and policy round trips"
     },
     "Pad": {
       "input_domain": "real 2D/3D",

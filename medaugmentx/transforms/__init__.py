@@ -32,11 +32,11 @@ from medaugmentx.transforms.modality.tomosynthesis import (
 # X-ray (DXR)
 from medaugmentx.transforms.modality.xray import GridArtifact, ScatterSimulation
 from medaugmentx.transforms.spatial.affine import RandomAffine
-from medaugmentx.transforms.spatial.crop import AnatomicCrop
+from medaugmentx.transforms.spatial.crop import AnatomicCrop, ClassBalancedCrop
 from medaugmentx.transforms.spatial.dropout import CoarseDropout
 from medaugmentx.transforms.spatial.elastic import ElasticDeform
 from medaugmentx.transforms.spatial.flip import RandomFlip
-from medaugmentx.transforms.spatial.resample import ResampleToSpacing
+from medaugmentx.transforms.spatial.resample import ResampleToGrid, ResampleToSpacing
 from medaugmentx.transforms.spatial.resize import CenterCrop, Pad, Resize
 
 __all__ = [
@@ -44,10 +44,12 @@ __all__ = [
     "RandomAffine",
     "RandomFlip",
     "AnatomicCrop",
+    "ClassBalancedCrop",
     "ElasticDeform",
     "CoarseDropout",
     "Resize",
     "ResampleToSpacing",
+    "ResampleToGrid",
     "Pad",
     "CenterCrop",
     # Intensity
