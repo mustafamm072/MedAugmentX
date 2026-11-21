@@ -31,9 +31,11 @@ dataset or transform chain from another framework. They accept the sample shapes
 those frameworks use — arrays, tensors, ``(image, mask)`` pairs, dictionaries,
 or a TorchIO ``Subject`` — and return the same kind they were given.
 
-MedAugmentX works on single-channel 2D and 3D data. A singleton channel
+The adapters accept single-channel 2D and 3D image fields. A singleton channel
 dimension is stripped before augmentation and restored afterwards; ``channel_dim``
-controls where the adapter expects to find it.
+controls where the adapter expects to find it. Use
+:meth:`~medaugmentx.MedVolume.with_channels` to augment registered channels
+together, then stack them for your model.
 
 Importing an adapter never imports its framework. Torch, MONAI, and TorchIO are
 touched only when a sample of that kind is actually passed through, so a single

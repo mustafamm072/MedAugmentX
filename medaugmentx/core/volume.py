@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from typing import Any
@@ -11,11 +12,12 @@ import numpy as np
 from medaugmentx.core import geometry
 from medaugmentx.core.geometry import PointMap
 from medaugmentx.core.physical import affine_spacing, axis_permutation, validate_affine
+from medaugmentx.core.resampling import grids_match
 
 
 @dataclass
 class MedVolume:
-    """A single medical image (2D or 3D) with optional segmentation mask.
+    """A medical image (2D or 3D) with optional registered channels and targets.
 
     All transforms in MedAugmentX operate on this container so that masks,
     geometric targets, and metadata stay in lockstep with the image array.
@@ -47,6 +49,9 @@ class MedVolume:
         affine: Optional 4x4 matrix mapping **array-axis** voxel centres to
             RAS patient coordinates in millimetres. ``None`` means patient
             geometry is unknown. Spacing is derived from its column lengths.
+        channels: Named additional intensity arrays already on the primary
+            image's grid. Use :meth:`with_channels` to check separately loaded
+            volumes before attaching them.
     """
 
     image: np.ndarray
@@ -60,6 +65,7 @@ class MedVolume:
     bboxes: np.ndarray | None = None
     bbox_labels: np.ndarray | None = None
     affine: np.ndarray | None = None
+    channels: dict[str, np.ndarray] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not isinstance(self.image, np.ndarray):
@@ -71,6 +77,17 @@ class MedVolume:
         if self.image.dtype.kind not in "buif":
             raise TypeError("image must contain real numeric intensities")
 
+        if not isinstance(self.channels, Mapping):
+            raise TypeError("channels must be a mapping of names to arrays")
+        self.channels = dict(self.channels)
+        for name, channel in self.channels.items():
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError("channel names must be non-empty strings")
+            if not isinstance(channel, np.ndarray) or channel.dtype.kind not in "buif":
+                raise TypeError(f"Channel {name!r} must be a real numeric NumPy array")
+            if channel.shape != self.image.shape:
+                raise ValueError(f"Channel {name!r} shape must match the primary image")
+
         if self.mask is not None:
             if not isinstance(self.mask, np.ndarray):
                 raise TypeError("mask must be a numpy.ndarray or None")
@@ -78,10 +95,13 @@ class MedVolume:
                 raise ValueError(
                     f"mask shape {self.mask.shape} does not match image shape {self.image.shape}"
                 )
-            if (
-                self.mask.dtype.kind not in "buif"
-                or not np.isfinite(self.mask).all()
-                or not np.equal(self.mask, np.rint(self.mask)).all()
+            kind = self.mask.dtype.kind
+            if kind not in "buif" or (
+                kind == "f"
+                and (
+                    not np.isfinite(self.mask).all()
+                    or not np.equal(self.mask, np.rint(self.mask)).all()
+                )
             ):
                 raise ValueError("mask must contain finite integer-valued labels")
 
@@ -226,6 +246,47 @@ class MedVolume:
     def modality(self) -> str | None:
         return self.metadata.get("modality")
 
+    def with_channels(self, channels: Mapping[str, MedVolume]) -> MedVolume:
+        """Attach separately loaded images after checking known patient grids.
+
+        Only the supplied images are added. Keep shared labels and annotations
+        on the primary volume. Resample mismatched registered grids explicitly
+        before attaching them. Existing channel names cannot be overwritten.
+        """
+        combined = dict(self.channels)
+        for name, channel in channels.items():
+            if not isinstance(channel, MedVolume):
+                raise TypeError("with_channels expects a mapping of names to MedVolume objects")
+            if name in combined:
+                raise ValueError(f"Channel {name!r} already exists")
+            if self.affine is None or channel.affine is None:
+                raise ValueError("with_channels requires known patient geometry for every image")
+            if self.shape != channel.shape or not grids_match(
+                self.affine, channel.affine, self.shape
+            ):
+                raise ValueError(f"Channel {name!r} must match the primary patient-space grid")
+            combined[name] = channel.image
+        return self.replace(channels=combined)
+
+    def stack_channels(self, *names: str) -> np.ndarray:
+        """Return a channel-first array with the primary image first.
+
+        List additional channel names to specify their order or select a subset.
+        With no names, use all additional channels in their insertion order.
+        """
+        return np.stack([self.image, *(self.channels[name] for name in names or self.channels)])
+
+    def select_channel(self, name: str | None = None) -> MedVolume:
+        """Return a single-channel volume with the shared annotations and grid."""
+        return self.replace(image=self.image if name is None else self.channels[name], channels={})
+
+    def _map_images(
+        self, image_map: Callable[[np.ndarray], np.ndarray]
+    ) -> tuple[np.ndarray, dict[str, np.ndarray]]:
+        return image_map(self.image), {
+            name: image_map(array) for name, array in self.channels.items()
+        }
+
     def replace(
         self,
         *,
@@ -238,6 +299,7 @@ class MedVolume:
         spacing: tuple[float, ...] | None = None,
         metadata: dict[str, Any] | None = None,
         affine: np.ndarray | None = None,
+        channels: dict[str, np.ndarray] | None = None,
     ) -> MedVolume:
         """Return a new MedVolume with selected fields swapped out.
 
@@ -257,13 +319,15 @@ class MedVolume:
             spacing=self.spacing if spacing is None else tuple(float(s) for s in spacing),
             metadata=dict(self.metadata if metadata is None else metadata),
             affine=self.affine if affine is None else affine,
+            channels=self.channels if channels is None else channels,
         )
 
     def warp(
         self,
         point_map: PointMap,
         *,
-        image: np.ndarray,
+        image: np.ndarray | None = None,
+        image_map: Callable[[np.ndarray], np.ndarray] | None = None,
         mask: np.ndarray | None = None,
         spacing: tuple[float, ...] | None = None,
         grid_map: np.ndarray | None = None,
@@ -279,13 +343,23 @@ class MedVolume:
         Args:
             point_map: The forward coordinate map matching the pixel warp — see
                 :mod:`medaugmentx.core.geometry` for the standard maps.
-            image: The already-transformed image array.
+            image: The already-transformed image array for single-channel inputs.
+            image_map: Apply the same precomputed spatial operation to every
+                intensity image. Supply either ``image`` or ``image_map``. Sample
+                random parameters before building this callable.
             mask: The already-transformed mask, if any.
             spacing: New voxel spacing (only :class:`~medaugmentx.transforms.Resize`
                 needs this); ``None`` keeps the current spacing.
             grid_map: Optional 4x4 output-to-input grid map. Changes the
                 sampling grid's affine; anatomy augmentations leave this unset.
         """
+        if (image is None) == (image_map is None):
+            raise ValueError("warp requires exactly one of image and image_map")
+        channels = None
+        if image_map is not None:
+            image, channels = self._map_images(image_map)
+        elif self.channels:
+            raise ValueError("warp requires image_map for volumes with additional channels")
         kp = None if self.keypoints is None else geometry.map_keypoints(self.keypoints, point_map)
         bb = None if self.bboxes is None else geometry.map_bboxes(self.bboxes, self.ndim, point_map)
         affine = self.affine
@@ -293,7 +367,13 @@ class MedVolume:
             affine = affine @ validate_affine(grid_map)
             spacing = affine_spacing(affine, self.ndim)
         return self.replace(
-            image=image, mask=mask, spacing=spacing, keypoints=kp, bboxes=bb, affine=affine
+            image=image,
+            mask=mask,
+            spacing=spacing,
+            keypoints=kp,
+            bboxes=bb,
+            affine=affine,
+            channels=channels,
         )
 
     def remove_out_of_bounds_targets(self, min_visibility: float = 0.0) -> MedVolume:
@@ -367,7 +447,13 @@ class MedVolume:
             spacing=tuple(self.spacing),
             metadata=deepcopy(self.metadata),
             affine=None if self.affine is None else self.affine.copy(),
+            channels={name: array.copy() for name, array in self.channels.items()},
         )
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        self.__dict__.update(state)
+        # Pickles written before channel support contain no channels field.
+        self.__dict__.setdefault("channels", {})
 
     def __repr__(self) -> str:
         mask_repr = (
@@ -378,6 +464,8 @@ class MedVolume:
             targets += f", keypoints={self.num_keypoints}"
         if self.bboxes is not None:
             targets += f", bboxes={self.num_bboxes}"
+        if self.channels:
+            targets += f", channels={tuple(self.channels)!r}"
         return (
             f"MedVolume(image=shape={self.image.shape}, dtype={self.image.dtype}, "
             f"mask={mask_repr}{targets}, spacing={self.spacing}, "

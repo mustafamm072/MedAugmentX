@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 
 from medaugmentx.core.physical import assumed_affine, axis_permutation
+from medaugmentx.core.resampling import grid_pull, grids_match, sample_grid_mask
 from medaugmentx.core.volume import MedVolume
 
 
@@ -22,7 +23,11 @@ def _import_nibabel():
 
 
 def load_nifti(
-    path: str, dtype: Any | None = np.float32, *, mask_path: str | None = None
+    path: str,
+    dtype: Any | None = np.float32,
+    *,
+    mask_path: str | None = None,
+    resample_mask: bool = False,
 ) -> MedVolume:
     """Load 2D/3D NIfTI data and optionally a registered integer label map.
 
@@ -35,8 +40,16 @@ def load_nifti(
     Args:
         path: NIfTI image filename.
         dtype: Output intensity dtype, or None to retain the proxy's scaled dtype.
-        mask_path: Optional label-map NIfTI on exactly the same physical grid.
+        mask_path: Optional registered label-map NIfTI. The default requires
+            matching shape and world coordinates across the grid (within 1e-4 mm).
+        resample_mask: For a grid mismatch, use the label map's header to sample
+            its labels onto the image grid. Enable this only for files already
+            sharing a patient coordinate system. Uses nearest-neighbour with
+            background 0 outside the source mask. Requires a coded qform or
+            sform in both files and raises if all nonzero labels disappear.
     """
+    if resample_mask and mask_path is None:
+        raise ValueError("resample_mask=True requires mask_path")
     nib = _import_nibabel()
     source = nib.load(str(path))
     data = np.asanyarray(source.dataobj)
@@ -71,11 +84,32 @@ def load_nifti(
     if mask_path is not None:
         mask_volume = load_nifti(mask_path, dtype=None)
         assert mask_volume.affine is not None and volume.affine is not None
-        if mask_volume.shape != volume.shape or not np.allclose(
-            mask_volume.affine, volume.affine, rtol=1e-5, atol=1e-5
+        labels = mask_volume.image
+        if mask_volume.shape != volume.shape or not grids_match(
+            mask_volume.affine, volume.affine, volume.shape
         ):
-            raise ValueError("NIfTI image and mask must have the same shape and patient-space grid")
-        volume = volume.replace(mask=mask_volume.image)
+            if not resample_mask:
+                raise ValueError(
+                    "NIfTI image and mask must have the same shape and patient-space grid"
+                )
+            if mask_volume.ndim != volume.ndim:
+                raise ValueError("NIfTI image and mask must have the same dimensionality")
+            if any(
+                not (v.metadata["nifti_qform_code"] or v.metadata["nifti_sform_code"])
+                for v in (volume, mask_volume)
+            ):
+                raise ValueError(
+                    "Resampling a NIfTI mask requires a coded qform or sform in both files"
+                )
+            # Validate before sampling so an invalid label cannot disappear
+            # during a crop or downsampling.
+            mask_volume.replace(mask=labels)
+            _, matrix, offset = grid_pull(mask_volume.affine, volume.affine, volume.shape)
+            aligned = sample_grid_mask(labels, matrix, offset, volume.shape)
+            if not aligned.any() and labels.any():
+                raise ValueError("Resampling removed all nonzero NIfTI mask labels")
+            labels = aligned
+        volume = volume.replace(mask=labels)
     return volume
 
 
@@ -95,14 +129,26 @@ def save_nifti(
     Args:
         volume: Volume to write.
         path: Image output filename.
-        mask_path: Optional separate integer-label output filename.
+        mask_path: Optional separate integer-label output filename. Floating
+            label maps must fit int64 or uint64 without changing any IDs.
         allow_assumed_geometry: Permit axis-aligned export when affine is unknown.
     """
     nib = _import_nibabel()
+    if volume.channels:
+        raise ValueError("save_nifti writes one intensity image; use volume.select_channel()")
     if mask_path is not None and volume.mask is None:
         raise ValueError("mask_path requires a mask")
     if mask_path is not None and str(mask_path) == str(path):
         raise ValueError("image and mask output paths must differ")
+    labels = volume.mask if mask_path is not None else None
+    if labels is not None and labels.dtype.kind not in "iu":
+        low, high = int(labels.min()), int(labels.max())
+        if -(2**63) <= low and high < 2**63:
+            labels = labels.astype(np.int64)
+        elif 0 <= low and high < 2**64:
+            labels = labels.astype(np.uint64)
+        else:
+            raise ValueError("NIfTI mask labels must fit int64 or uint64 for lossless export")
     affine = volume.affine
     if affine is None:
         if not allow_assumed_geometry:
@@ -129,8 +175,5 @@ def save_nifti(
 
     write(volume.image, path)
     if mask_path is not None:
-        assert volume.mask is not None
-        labels = volume.mask
-        if labels.dtype.kind not in "iu":
-            labels = labels.astype(np.int64)
+        assert labels is not None
         write(labels, mask_path)

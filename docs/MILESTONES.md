@@ -131,6 +131,12 @@ Contributors: see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## Current adoption priorities
 
+The training workflow now supports exact-spacing preprocessing followed by
+fixed-size, class-balanced segmentation patches and synchronized spatial
+augmentation of registered channels. The
+[research guide](RESEARCH_GUIDE.md#report-a-useful-comparison) covers paired
+policy evaluation on a held-out cohort.
+
 Version 1 implements the geometry, integration, policy, numerical-validation,
 QA and release-tooling work from the [October review](PROJECT_REVIEW.md).
 See [release readiness](RELEASE_READINESS.md) for measured evidence and remaining

@@ -46,11 +46,27 @@ def measure(name: str, shape: tuple[int, ...], repeats: int) -> dict:
         spacing=(1.0, 0.5, 0.5) if len(shape) == 3 else (0.5, 0.5),
     )
     kwargs = {"p": 1.0, "seed": 0}
-    factors = {"AnatomicCrop": 0.5, "CenterCrop": 0.5, "Resize": 0.625, "Pad": 1.5}
+    factors = {
+        "AnatomicCrop": 0.5,
+        "ClassBalancedCrop": 0.5,
+        "CenterCrop": 0.5,
+        "Resize": 0.625,
+        "Pad": 1.5,
+    }
     if name in factors:
         kwargs["size"] = tuple(max(1, round(s * factors[name])) for s in shape)
+    if name == "ClassBalancedCrop":
+        kwargs["foreground_prob"] = 1.0
     if name == "ResampleToSpacing":
         kwargs["spacing"] = tuple(s * 1.25 for s in volume.spacing)
+    if name == "ResampleToGrid":
+        affine = np.eye(4)
+        affine[: len(shape), : len(shape)] = np.diag(volume.spacing)
+        volume = volume.replace(affine=affine)
+        target = affine.copy()
+        target[0, 3] = 0.5
+        kwargs["affine"] = target
+        kwargs["shape"] = tuple(max(1, s // 2) for s in shape)
     if name == "HistogramMatch":
         kwargs["reference_quantiles"] = np.linspace(0, 1, 256).tolist()
     transform = REGISTRY[name](**kwargs)

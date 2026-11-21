@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   registered transforms in 2D/3D, and retain worker errors in CLI diagnostics.
 - Match image and mask nearest-neighbour sampling at half-voxel boundaries
   while preserving exact int64/uint64 mask labels.
+- Preserve exact 64-bit mask IDs and support float16 label maps in resize,
+  affine, elastic, and DBT compression transforms. Skip redundant floating
+  point validation passes on integer and Boolean masks.
+- Compare paired NIfTI grids by absolute physical displacement across the
+  field of view, avoiding missed mismatches at large patient-space origins.
+- Preserve large integer-valued labels during NIfTI export and reject masks
+  that cannot be written losslessly as signed or unsigned integer labels.
 
 ### Added
 
@@ -24,6 +31,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   voxel limit checked before allocation. Adds no required dependencies.
 - `MedVolume.world_to_index` to import RAS-mm landmarks as continuous array
   indices, including explicit off-plane rejection for 2D images.
+- `ClassBalancedCrop` for fixed-size 2D/3D training patches, with optional
+  per-scan class-balanced anchors, padding, and deterministic replay.
+- `ResampleToGrid` for registered data, using an explicit target shape and
+  affine. NIfTI loading supports opt-in alignment of registered label maps.
+- Named registered `MedVolume` channels with synchronized spatial transforms,
+  channel-first stacking and reproducible replay.
+- Paired segmentation policy evaluation across matched seeds and held-out
+  patients, including patient-level split checks and bootstrap intervals.
 
 ## [1.0.0] — 2026-10-25
 

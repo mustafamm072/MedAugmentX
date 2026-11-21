@@ -12,6 +12,7 @@ from medaugmentx.core import (
     SomeOf,
     Transform,
 )
+from medaugmentx.evaluation import compare_segmentation_policies
 from medaugmentx.inspection import PipelineStep, iter_pipeline, pipeline_summary
 from medaugmentx.qa import preview_augmentation, volume_summary
 from medaugmentx.reproducibility import (
@@ -34,6 +35,7 @@ __all__ = [
     "list_model_cards",
     "preview_augmentation",
     "volume_summary",
+    "compare_segmentation_policies",
     "apply_for_sample",
     "seed_for_sample",
     "record_augmentation",

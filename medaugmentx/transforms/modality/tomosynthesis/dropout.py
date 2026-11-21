@@ -64,14 +64,19 @@ class SliceDropout(Transform):
             return volume
 
         idxs = self.rng.choice(depth, size=n, replace=False)
-        new_image = volume.image.copy()
-        new_image[idxs] = self.cval
+
+        def dropout(array: np.ndarray) -> np.ndarray:
+            out = array.copy()
+            out[idxs] = self.cval
+            return out
+
+        new_image, channels = volume._map_images(dropout)
 
         new_mask = None
         if volume.mask is not None and self.affect_mask:
             new_mask = volume.mask.copy()
             new_mask[idxs] = 0
-        return volume.replace(image=new_image, mask=new_mask)
+        return volume.replace(image=new_image, mask=new_mask, channels=channels)
 
     def to_dict(self) -> dict[str, Any]:
         nr = self.num_range

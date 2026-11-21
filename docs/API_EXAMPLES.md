@@ -179,6 +179,11 @@ volumes after crop, pad, or resize.
 
 ---
 
+For a registered label map stored on a different NIfTI grid, use
+`load_nifti("image.nii.gz", mask_path="label.nii.gz", resample_mask=True)`.
+The loader uses the stored affines and nearest-neighbour label sampling.
+Omitting `resample_mask` keeps the strict grid check.
+
 ## 8. Serialise a pipeline to JSON and reload it
 
 ```python

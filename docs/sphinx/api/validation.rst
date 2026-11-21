@@ -55,3 +55,8 @@ error-severity issues — so ``if not report:`` is the idiomatic check.
 
 .. autoclass:: medaugmentx.ValidationError
    :members:
+
+Held-out segmentation comparisons
+---------------------------------
+
+.. autofunction:: medaugmentx.compare_segmentation_policies

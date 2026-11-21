@@ -210,6 +210,12 @@ fixed shape. Neither operation reorients scans or registers patients. The
 voxel limit can bound output size before resampling; it is not a peak-memory
 limit. Downsampling can remove small mask labels.
 
+When registered scans need the same orientation, origin, spacing, and shape,
+use `ResampleToGrid(reference.shape, reference.affine)`. Both scans must
+already share a patient coordinate system. This also lets you move processed
+data back onto its original grid. See the
+[spacing and patch example](examples/spacing_preprocessing.py).
+
 When an affine is available, convert external RAS-mm landmarks with
 `vol.world_to_index(points)` and export them with `vol.index_to_world(points)`.
 For 2D images, off-plane world points raise explicitly.
@@ -217,6 +223,49 @@ For 2D images, off-plane world points raise explicitly.
 Spatial transforms use nearest-neighbour interpolation for masks, so label IDs
 are never blended. Cropping and resampling can remove small structures or whole
 classes; `Guard` can check for label loss.
+
+### Sample fixed-size segmentation training patches
+
+Use `ClassBalancedCrop` to give small and large mask classes an equal chance
+of anchoring a foreground patch within a scan. The patch has the requested
+shape even when a scan has short axes.
+
+```python
+from medaugmentx import apply_for_sample
+from medaugmentx.transforms import ClassBalancedCrop
+
+patch_policy = ClassBalancedCrop((32, 96, 96), foreground_prob=0.75, labels=(1, 3))
+patch = apply_for_sample(patch_policy, prepared_volume, seed=42, sample_id=scan_id, epoch=epoch)
+```
+
+Set `labels` to the mask classes that should anchor patches. The uniform branch
+and scans without an eligible class sample across the whole image. Padding uses
+class `0` in the mask. Choose `cval` in the image's intensity units, for example
+`-1024` for air in raw CT. See the [research guide](docs/RESEARCH_GUIDE.md#training-with-patches)
+for training and evaluation details.
+
+### Augment registered channels together
+
+Load separately acquired channels as volumes and check that they share a
+patient grid before building a model input.
+
+```python
+from medaugmentx import Compose, apply_for_sample
+from medaugmentx.io import load_nifti
+from medaugmentx.transforms import ClassBalancedCrop, RandomAffine
+
+t1 = load_nifti("t1.nii.gz", mask_path="segmentation.nii.gz")
+flair = load_nifti("flair.nii.gz")
+sample = t1.with_channels({"flair": flair})
+policy = Compose([RandomAffine(rotation=8), ClassBalancedCrop((32, 96, 96))])
+patch = apply_for_sample(policy, sample, seed=42, sample_id=scan_id, epoch=epoch)
+inputs, target = patch.stack_channels("flair"), patch.mask
+```
+
+Spatial transforms sample one geometry for all channels and shared annotations.
+Apply channel-specific intensity policies to each image before attaching it.
+To compare policies across training seeds and held-out patients, use
+`compare_segmentation_policies`. [Runnable comparison](examples/compare_segmentation_policies.py)
 
 ---
 
@@ -413,6 +462,17 @@ Patient geometry uses an authoritative array-index-to-RAS-mm affine and is
 updated after crop, pad and resize. Use `mask_path` to load/export registered
 NIfTI labels. See [v1 migration and integration limits](docs/MIGRATION_V1.md).
 
+For labels already registered to the image but stored on a different sampling
+grid, opt in to nearest-neighbour alignment at load time.
+
+```python
+volume = load_nifti("image.nii.gz", mask_path="labels.nii.gz", resample_mask=True)
+```
+
+The default requires matching grids. With alignment enabled, both files must
+have coded geometry, and the loader raises if sampling removes every nonzero
+label. Check small structures after downsampling.
+
 > Requires the `io` extra: `pip install "medaugmentx[io]"`
 
 ---
@@ -481,9 +541,12 @@ See [API examples](docs/API_EXAMPLES.md) and the
 | `RandomAffine` | Rotation + scaling + translation, 2D/3D, axis-aware |
 | `RandomFlip` | Per-axis flip with independent probability |
 | `AnatomicCrop` | Foreground-biased random crop |
+| `ClassBalancedCrop` | Fixed-size crop with uniform sampling among eligible mask classes |
 | `ElasticDeform` | Gaussian-smoothed elastic displacement fields with per-axis parameters |
 | `CoarseDropout` | Cutout-style random box occlusion (2D/3D) |
 | `Resize` | Resample to a fixed shape (rescales spacing) |
+| `ResampleToSpacing` | Standardize voxel spacing while preserving the physical centre |
+| `ResampleToGrid` | Sample onto a registered reference shape and patient-space affine |
 | `Pad` | Centre-pad up to a target shape |
 | `CenterCrop` | Centre-crop to a target shape |
 

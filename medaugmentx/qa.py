@@ -16,7 +16,7 @@ def volume_summary(volume: MedVolume, reference: MedVolume | None = None) -> dic
     """Describe intensities, labels and targets without identifiers or source paths."""
     finite = volume.image[np.isfinite(volume.image)]
     report = VolumeValidator(forbid_constant=False).validate(volume, reference)
-    return {
+    summary = {
         "shape": list(volume.shape),
         "dtype": str(volume.image.dtype),
         "spacing_mm": list(volume.spacing),
@@ -47,6 +47,12 @@ def volume_summary(volume: MedVolume, reference: MedVolume | None = None) -> dic
             for issue in report.issues
         ],
     }
+    if volume.channels:
+        summary["channels"] = {
+            name: {"dtype": str(array.dtype), "finite_fraction": float(np.isfinite(array).mean())}
+            for name, array in volume.channels.items()
+        }
+    return summary
 
 
 def preview_augmentation(

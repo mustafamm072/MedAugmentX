@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Union
 
 import numpy as np
@@ -36,6 +37,31 @@ def as_float32(image: np.ndarray) -> np.ndarray:
     if image.dtype == np.float32:
         return image
     return image.astype(np.float32, copy=False)
+
+
+def sample_mask(mask: np.ndarray, nearest: Callable[[np.ndarray], np.ndarray]) -> np.ndarray:
+    """Apply a nearest-neighbour sampler with zero fill, preserving label IDs."""
+    kind, itemsize = mask.dtype.kind, mask.dtype.itemsize
+    if kind == "f" and itemsize < 4:
+        # SciPy does not support float16, which is lossless in float32.
+        return nearest(as_float32(mask)).astype(mask.dtype, copy=False)
+
+    # SciPy rounds integer outputs via a half-unit adjustment, so exact
+    # representation as a double alone is insufficient near 2**53.
+    wide_integer = (
+        kind in "iu" and itemsize == 8 and (int(mask.min()) < -(2**52) or int(mask.max()) > 2**52)
+    )
+    if wide_integer or (kind == "f" and itemsize > 8):
+        # SciPy's numeric path uses doubles even at order zero. Sample flat
+        # indices instead and use index 0 for the sampler's background fill.
+        index_dtype = np.uint32 if mask.size <= np.iinfo(np.uint32).max else np.uint64
+        indices = np.arange(1, mask.size + 1, dtype=index_dtype).reshape(mask.shape)
+        lookup = np.empty(mask.size + 1, dtype=mask.dtype)
+        lookup[0] = 0
+        lookup[1:] = mask.ravel()
+        return lookup[nearest(indices)]
+
+    return nearest(mask).astype(mask.dtype, copy=False)
 
 
 def normalize_axes(axes: int | tuple | list | None, ndim: int) -> tuple:

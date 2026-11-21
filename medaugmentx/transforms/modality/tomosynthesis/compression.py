@@ -10,7 +10,7 @@ from scipy.ndimage import affine_transform
 from medaugmentx.core import geometry
 from medaugmentx.core.base import Transform
 from medaugmentx.core.parameters import validate_parameters
-from medaugmentx.core.utils import SeedLike, as_float32, axis_label_to_index
+from medaugmentx.core.utils import SeedLike, as_float32, axis_label_to_index, sample_mask
 from medaugmentx.core.volume import MedVolume
 
 Range = Union[float, tuple[float, float]]
@@ -93,20 +93,16 @@ class CompressionVariation(Transform):
         if abs(s - 1.0) < 1e-8:
             return volume
 
-        image = as_float32(volume.image)
-        new_image = self._scale_axis_array(image, ax, s, self.order)
-
         new_mask = None
         if volume.mask is not None:
-            m = self._scale_axis_array(volume.mask.astype(np.float64), ax, s, 0)
-            new_mask = np.rint(m).astype(volume.mask.dtype, copy=False)
+            new_mask = sample_mask(volume.mask, lambda arr: self._scale_axis_array(arr, ax, s, 0))
 
         forward = np.eye(volume.ndim)
         forward[ax, ax] = s
         centre = (np.asarray(volume.shape, dtype=np.float64) - 1.0) / 2.0
         return volume.warp(
             geometry.affine_map(forward, centre, np.zeros(volume.ndim)),
-            image=new_image.astype(np.float32, copy=False),
+            image_map=lambda array: self._scale_axis_array(as_float32(array), ax, s, self.order),
             mask=new_mask,
         )
 

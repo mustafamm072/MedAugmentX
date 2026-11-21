@@ -115,6 +115,12 @@ def _fingerprint(volume: MedVolume) -> str:
                 else arr.tobytes()
             )
     metadata = _make_serialisable(volume.metadata)
+    if volume.channels:
+        digest.update(b"channels")
+        for name, channel in volume.channels.items():
+            arr = np.ascontiguousarray(channel)
+            digest.update(json.dumps([name, arr.shape, arr.dtype.str]).encode())
+            digest.update(memoryview(arr).cast("B"))
     digest.update(
         json.dumps(
             [volume.spacing, metadata],

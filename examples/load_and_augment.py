@@ -7,6 +7,10 @@ Run with:
     # NIfTI
     python examples/load_and_augment.py brain_t1.nii.gz --out brain_augmented.nii.gz
 
+    # Registered NIfTI labels stored on a different sampling grid
+    python examples/load_and_augment.py brain_t1.nii.gz --mask labels.nii.gz --resample-mask \
+        --out brain_augmented.nii.gz --mask-out labels_augmented.nii.gz
+
     # DICOM directory (save skipped — no DICOM writer)
     python examples/load_and_augment.py /path/to/CT_series/
 
@@ -30,11 +34,11 @@ def build_ct_pipeline(seed: int):
     return ct_pipeline(seed=seed)
 
 
-def load(path: str, mask_path: str | None = None):
+def load(path: str, mask_path: str | None = None, *, resample_mask: bool = False):
     if path.endswith(".nii") or path.endswith(".nii.gz"):
         from medaugmentx.io import load_nifti
 
-        return "nifti", load_nifti(path, mask_path=mask_path)
+        return "nifti", load_nifti(path, mask_path=mask_path, resample_mask=resample_mask)
     if mask_path is not None:
         raise ValueError("--mask currently supports registered NIfTI inputs only")
     from medaugmentx.io import load_dicom_series
@@ -59,6 +63,11 @@ def main() -> int:
     parser.add_argument("input", help="Path to .nii/.nii.gz file or DICOM directory")
     parser.add_argument("--out", help="Where to save the augmented volume (NIfTI only)")
     parser.add_argument("--mask", help="Registered NIfTI label map")
+    parser.add_argument(
+        "--resample-mask",
+        action="store_true",
+        help="Align an already registered NIfTI label map to the image grid",
+    )
     parser.add_argument("--mask-out", help="Augmented label-map output (requires --mask and --out)")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
@@ -71,12 +80,16 @@ def main() -> int:
 
     if args.mask_out and (not args.mask or not args.out):
         parser.error("--mask-out requires --mask and --out")
+    if args.resample_mask and not args.mask:
+        parser.error("--resample-mask requires --mask")
     try:
-        kind, vol = load(args.input, args.mask)
+        kind, vol = load(args.input, args.mask, resample_mask=args.resample_mask)
     except ImportError as exc:
         print(f"Missing optional dependency: {exc}", file=sys.stderr)
         print('Install with: pip install "medaugmentx[io]"', file=sys.stderr)
         return 2
+    except ValueError as exc:
+        parser.error(str(exc))
 
     print("loaded :", vol)
 
