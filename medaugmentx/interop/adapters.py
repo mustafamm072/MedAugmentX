@@ -94,6 +94,8 @@ def _restore_array(array: np.ndarray, spec: _ArraySpec, affine: np.ndarray | Non
         if spec.preserve_dtype:
             if spec.template.dtype.kind in "iu":
                 bounds = np.iinfo(spec.template.dtype)
+                if out.dtype.kind == "f":
+                    out = np.rint(out)  # casting alone truncates toward zero
                 out = np.clip(out, bounds.min, bounds.max)
             out = out.astype(spec.template.dtype, copy=False)
         return np.ascontiguousarray(out)
@@ -103,6 +105,8 @@ def _restore_array(array: np.ndarray, spec: _ArraySpec, affine: np.ndarray | Non
     if spec.preserve_dtype:
         if not spec.template.dtype.is_floating_point and spec.template.dtype != torch.bool:
             bounds = torch.iinfo(spec.template.dtype)
+            if tensor.is_floating_point():
+                tensor = torch.round(tensor)  # casting alone truncates toward zero
             tensor = tensor.clamp(bounds.min, bounds.max)
         tensor = tensor.to(spec.template.dtype)
     if hasattr(spec.template, "applied_operations") and hasattr(spec.template, "affine"):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from contextvars import ContextVar
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from typing import Any
@@ -13,6 +14,10 @@ from medaugmentx.core import geometry
 from medaugmentx.core.geometry import PointMap
 from medaugmentx.core.physical import affine_spacing, axis_permutation, validate_affine
 from medaugmentx.core.resampling import grids_match
+
+# Set by wrappers such as PerChannel that only accept intensity transforms; any
+# spatial transform reaching MedVolume.warp while it is set raises this message.
+FORBID_WARP: ContextVar[str | None] = ContextVar("medaugmentx_forbid_warp", default=None)
 
 
 @dataclass
@@ -306,8 +311,11 @@ class MedVolume:
         Any field left as ``None`` keeps its current value, so a transform that
         only rewrites the image (every intensity/artifact transform) implicitly
         carries the mask and geometric targets through unchanged. Metadata is
-        shallow-copied to avoid silent aliasing across volumes.
+        shallow-copied to avoid silent aliasing across volumes. A new ``affine``
+        without ``spacing`` re-derives spacing from the affine.
         """
+        if spacing is None and affine is not None:
+            spacing = ()
         return replace(
             self,
             image=self.image if image is None else image,
@@ -353,6 +361,9 @@ class MedVolume:
             grid_map: Optional 4x4 output-to-input grid map. Changes the
                 sampling grid's affine; anatomy augmentations leave this unset.
         """
+        forbidden = FORBID_WARP.get()
+        if forbidden is not None:
+            raise ValueError(forbidden)
         if (image is None) == (image_map is None):
             raise ValueError("warp requires exactly one of image and image_map")
         channels = None
@@ -384,8 +395,9 @@ class MedVolume:
         off the edge. Call this to prune such targets for a detection/landmark
         head:
 
-        - keypoints strictly inside ``[0, size)`` on every axis are kept; the
-          rest (and their labels) are removed;
+        - keypoints inside ``[0, size - 1]`` (the span of voxel centres) on
+          every axis are kept; the rest (and their labels) are removed. The
+          interval matches box clipping and is symmetric under flips;
         - boxes are clipped to ``[0, size - 1]`` and dropped when their retained
           fraction of the original area is ``< min_visibility`` (with the
           default ``0.0`` only boxes with no overlap at all are dropped).
@@ -402,7 +414,7 @@ class MedVolume:
         shape = np.asarray(self.shape, dtype=np.float64)
         new_kp, new_kp_labels = self.keypoints, self.keypoint_labels
         if self.keypoints is not None:
-            inside = np.all((self.keypoints >= 0) & (self.keypoints < shape), axis=1)
+            inside = np.all((self.keypoints >= 0) & (self.keypoints <= shape - 1), axis=1)
             new_kp = self.keypoints[inside]
             if self.keypoint_labels is not None:
                 new_kp_labels = self.keypoint_labels[inside]

@@ -103,3 +103,33 @@ def test_transform_ownership_prevents_rng_aliasing():
     with pytest.raises(ValueError, match="shared"):
         OneOf([transform])
     assert len(first) == 1
+
+
+def test_record_tolerates_nonfinite_metadata():
+    volume = MedVolume(np.ones((4, 4), np.float32), metadata={"rescale_slope": float("nan")})
+    output, record = record_augmentation(GaussianNoise(std=0.1, seed=1), volume)
+    np.testing.assert_array_equal(replay_augmentation(record, volume).image, output.image)
+
+
+def test_set_metadata_fingerprint_is_independent_of_hash_seed():
+    import os
+    import subprocess
+    import sys
+
+    code = (
+        "import numpy as np;from medaugmentx import MedVolume;"
+        "from medaugmentx.reproducibility import _fingerprint;"
+        "print(_fingerprint(MedVolume(np.zeros((2, 2)), "
+        "metadata={'tags': {'t1', 'flair', 'dwi', 'adc', 'swi'}})))"
+    )
+    digests = {
+        subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            check=True,
+            env={**os.environ, "PYTHONHASHSEED": seed},
+        ).stdout
+        for seed in ("1", "2", "3")
+    }
+    assert len(digests) == 1

@@ -20,7 +20,7 @@ code. Version 1 follows semantic versioning for these public imports. Internal m
 
 ```python
 from medaugmentx import (                # core data model and pipelines
-    MedVolume, Transform, Compose, OneOf, SomeOf,
+    MedVolume, Transform, Compose, OneOf, SomeOf, PerChannel,
     PipelineStep, iter_pipeline, pipeline_summary,
     VolumeValidator, Guard, ValidationReport, ValidationIssue, ValidationError,
 )
@@ -161,8 +161,23 @@ Pass the names explicitly to select channels and pin their order.
 
 Spatial transforms and coarse or slice dropout share one set of sampled
 parameters for all images. Intensity and appearance transforms operate on the
-primary image. Apply separate intensity policies to each loaded image before
-joining it. A spatial transform's image padding or fill is shared across
+primary image. Wrap them in `PerChannel` to augment the channels too, within
+the same policy:
+
+```python
+PerChannel(Compose([BiasField(alpha=0.3), GaussianNoise(std=0.02)]))
+PerChannel(GammaCorrection(), channels=["flair"], include_primary=False)
+PerChannel(BrightnessContrast(), shared=True)  # one draw reused per image
+```
+
+By default each image gets its own draw, in the order primary image, then the
+selected channels (`channels=None` selects all, in insertion order). Use
+`shared=True` when channels share an intensity scale and should change
+together. The wrapped transform must leave shape, mask, geometry, and targets
+unchanged, so spatial transforms raise `ValueError`; place them outside the
+wrapper, where they already move every channel together. Metadata is taken from
+the primary image's result. `PerChannel` serialises, inspects, and replays like
+`Guard`. A spatial transform's image padding or fill is shared across
 channels, so choose it for their common intensity scale. A custom spatial
 transform can pass `image_map=` to `MedVolume.warp` to reuse one sampled mapping.
 
@@ -236,7 +251,11 @@ kind they were given:
 The framework adapters accept single-channel 2D and 3D image fields. `channel_dim` — `None`,
 `"auto"`, `"first"`, `"last"`, or an integer axis — says where the adapter
 should expect a singleton channel dimension; it is stripped before augmentation
-and restored afterwards.
+and restored afterwards. `"auto"` treats a leading (or else trailing) singleton
+axis of a 3D or 4D array as the channel, so a single-slice 3D volume shaped
+`(1, H, W)` becomes 2D. Pass `channel_dim=None` for such volumes. With
+`preserve_image_dtype=True`, floating results are rounded to the nearest integer
+before integer dtypes are restored.
 
 TorchIO adapters require their configured image and optional label keys.
 Additional images are rejected because they would not receive the sampled warp.

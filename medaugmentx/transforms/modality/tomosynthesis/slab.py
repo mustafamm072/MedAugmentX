@@ -9,7 +9,7 @@ import numpy as np
 from medaugmentx.core import geometry
 from medaugmentx.core.base import Transform
 from medaugmentx.core.parameters import validate_parameters
-from medaugmentx.core.utils import SeedLike
+from medaugmentx.core.utils import SeedLike, as_float32
 from medaugmentx.core.volume import MedVolume
 
 IntRange = Union[int, tuple[int, int]]
@@ -21,7 +21,8 @@ class SlabShift(Transform):
     Simulates inter-scan variation in the reconstruction centre between two
     DBT acquisitions of the same patient. The number of slices and the
     voxel spacing are preserved; gaps introduced by the shift are filled
-    with ``cval`` (default zero, i.e. air).
+    with ``cval`` (default zero, i.e. air). Images are returned as float32 so
+    ``cval`` is never truncated or wrapped by an integer input dtype.
 
     Args:
         max_shift: Maximum absolute shift in slices. Either an int (treated
@@ -79,7 +80,7 @@ class SlabShift(Transform):
         )
         return volume.warp(
             geometry.translate_map(np.array([shift, 0.0, 0.0])),
-            image_map=lambda array: self._shift_array(array, shift, self.cval),
+            image_map=lambda array: self._shift_array(as_float32(array), shift, self.cval),
             mask=new_mask,
         )
 

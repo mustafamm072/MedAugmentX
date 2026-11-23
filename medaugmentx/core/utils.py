@@ -51,7 +51,8 @@ def sample_mask(mask: np.ndarray, nearest: Callable[[np.ndarray], np.ndarray]) -
     wide_integer = (
         kind in "iu" and itemsize == 8 and (int(mask.min()) < -(2**52) or int(mask.max()) > 2**52)
     )
-    if wide_integer or (kind == "f" and itemsize > 8):
+    # SciPy rejects long double even where it is only 8 bytes (macOS arm64, Windows).
+    if wide_integer or (kind == "f" and (itemsize > 8 or mask.dtype.char == "g")):
         # SciPy's numeric path uses doubles even at order zero. Sample flat
         # indices instead and use index 0 for the sampler's background fill.
         index_dtype = np.uint32 if mask.size <= np.iinfo(np.uint32).max else np.uint64
@@ -112,7 +113,7 @@ def axis_label_to_index(label: str, ndim: int) -> int:
 def clip_intensity(
     image: np.ndarray, lo: float | None = None, hi: float | None = None
 ) -> np.ndarray:
-    """Clip in-place if writeable, otherwise return a clipped copy."""
+    """Return a clipped copy, or ``image`` itself when both bounds are None."""
     if lo is None and hi is None:
         return image
     return np.clip(image, lo, hi)

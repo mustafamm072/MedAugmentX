@@ -52,13 +52,17 @@ if TYPE_CHECKING:
 
 REGISTRY: dict[str, type] = {}
 SCHEMA_VERSION = 1
+# Built-in wrappers that nest exactly one child under ``params["transform"]``.
+WRAPPER_NAMES = ("Guard", "PerChannel")
 
 
 def _register_builtins() -> None:
     # Core containers
-    from medaugmentx.core.compose import Compose, OneOf, SomeOf
+    from medaugmentx.core.compose import Compose, OneOf, PerChannel, SomeOf
 
-    REGISTRY.update({"Compose": Compose, "OneOf": OneOf, "SomeOf": SomeOf})
+    REGISTRY.update(
+        {"Compose": Compose, "OneOf": OneOf, "SomeOf": SomeOf, "PerChannel": PerChannel}
+    )
 
     # Spatial
     from medaugmentx.transforms.spatial.affine import RandomAffine
@@ -262,7 +266,8 @@ def from_dict(d: dict[str, Any]) -> Transform:
         {"name": "GaussianNoise", "params": {"std": 0.05, "p": 1.0}}
 
     Container transforms (``Compose``, ``OneOf``, ``SomeOf``) nest child
-    dicts under ``params["transforms"]`` and are reconstructed recursively.
+    dicts under ``params["transforms"]``; the ``Guard`` and ``PerChannel``
+    wrappers nest one under ``params["transform"]``. Both are rebuilt recursively.
 
     Args:
         d: Dict as returned by ``transform.to_dict()``.
@@ -320,7 +325,7 @@ def from_dict(d: dict[str, Any]) -> Transform:
             if not isinstance(children, (list, tuple)):
                 raise ValueError("Container transforms must be a list")
             params["transforms"] = [build(child, depth + 1) for child in children]
-        if name == "Guard" and "transform" in params:
+        if name in WRAPPER_NAMES and "transform" in params:
             params["transform"] = build(params["transform"], depth + 1)
         cls = REGISTRY[name]
         if not isinstance(cls, type) or not issubclass(cls, Transform):
@@ -421,6 +426,16 @@ def _reject_json_constant(value: str) -> Any:
     raise ValueError(f"Non-finite JSON constant {value!r} is not supported")
 
 
+def _warn_if_unversioned(parsed: Any) -> None:
+    if isinstance(parsed, dict) and "schema_version" not in parsed:
+        warnings.warn(
+            "Loading an unversioned pre-1.0 policy; v1 geometry and preset semantics apply. "
+            "Re-export and review the migrated policy before use.",
+            UserWarning,
+            stacklevel=3,
+        )
+
+
 def to_json(transform: Transform, indent: int = 2) -> str:
     """Serialise a transform (or pipeline) to a JSON string.
 
@@ -450,13 +465,7 @@ def from_json(s: str) -> Transform:
         parsed = json.loads(s, parse_constant=_reject_json_constant)
     except RecursionError as exc:
         raise ValueError("Pipeline document is nested too deeply") from exc
-    if isinstance(parsed, dict) and "schema_version" not in parsed:
-        warnings.warn(
-            "Loading an unversioned pre-1.0 policy; v1 geometry and preset semantics apply. "
-            "Re-export and review the migrated policy before use.",
-            UserWarning,
-            stacklevel=2,
-        )
+    _warn_if_unversioned(parsed)
     return from_dict(parsed)
 
 
@@ -514,12 +523,7 @@ def from_yaml(s: str) -> Transform:
         parsed = yaml.safe_load(s)
     except RecursionError as exc:
         raise ValueError("Pipeline document is nested too deeply") from exc
-    if isinstance(parsed, dict) and "schema_version" not in parsed:
-        warnings.warn(
-            "Loading an unversioned pre-1.0 policy; review v1 migration semantics",
-            UserWarning,
-            stacklevel=2,
-        )
+    _warn_if_unversioned(parsed)
     return from_dict(parsed)
 
 

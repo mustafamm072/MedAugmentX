@@ -121,6 +121,11 @@ base class handles:
   run regardless of the child's own `p`.
 - **`SomeOf`** picks `n` (or a range) children without replacement and
   applies them in deterministic order.
+- **`PerChannel`** wraps one intensity transform and applies it to the primary
+  image and the selected named channels, with independent draws from one
+  derived stream or, with `shared=True`, by restoring every RNG state in the
+  wrapped subtree before each image. It rejects children that change shape,
+  mask, geometry, or targets.
 
 All three containers override `to_dict()` to serialise their children
 recursively, enabling lossless round-trip serialisation of entire pipelines.
@@ -216,6 +221,8 @@ class MyTransform(Transform):
 **`from_dict(d)`** reconstructs any transform from its dict form.
 Containers (`Compose`, `OneOf`, `SomeOf`) are handled recursively — the
 `"transforms"` list in `params` is reconstructed before the container itself.
+The single-child wrappers listed in `WRAPPER_NAMES` (`Guard`, `PerChannel`)
+nest their child under `params["transform"]` and are rebuilt the same way.
 
 JSON serialisation uses only the Python standard library. YAML is optional
 (`pip install pyyaml`) and exposed via `to_yaml` / `from_yaml`.
@@ -256,8 +263,8 @@ at module import time. Tensor and subject support is duck-typed and restores
 framework objects only when those objects are actually passed.
 
 Channel rule: adapters accept single-channel 2D/3D image fields. For several
-registered images, construct a `MedVolume` with named channels and use
-`stack_channels` after augmentation.
+registered images, construct a `MedVolume` with named channels, wrap intensity
+policies in `PerChannel`, and use `stack_channels` after augmentation.
 Adapters may strip one singleton channel axis before augmentation and restore
 it after augmentation.
 

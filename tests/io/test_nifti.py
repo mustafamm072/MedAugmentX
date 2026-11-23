@@ -34,12 +34,60 @@ def test_2d_round_trip(tmp_path):
 
 def test_metadata_includes_affine(tmp_path):
     img = np.zeros((4, 4, 4), dtype=np.float32)
-    vol = MedVolume(image=img, spacing=(1.0, 1.0, 1.0))
+    vol = MedVolume(image=img, affine=np.diag([1.0, 2.0, 3.0, 1.0]))
     path = tmp_path / "x.nii.gz"
     save_nifti(vol, str(path))
     reloaded = load_nifti(str(path))
     assert "affine" in reloaded.metadata
     assert reloaded.metadata["affine"].shape == (4, 4)
+    np.testing.assert_allclose(reloaded.affine, vol.affine)
+
+
+def test_unknown_geometry_stays_unknown_through_round_trip(tmp_path):
+    vol = MedVolume(np.zeros((3, 4, 5), np.float32), spacing=(2.0, 0.5, 0.75))
+    path = tmp_path / "unknown.nii.gz"
+    with pytest.warns(UserWarning, match="assumed"):
+        save_nifti(vol, str(path))
+    header = nibabel.load(str(path)).header
+    assert int(header["qform_code"]) == int(header["sform_code"]) == 0
+    reloaded = load_nifti(str(path))
+    assert reloaded.affine is None and "affine" not in reloaded.metadata
+    np.testing.assert_allclose(reloaded.spacing, vol.spacing)
+    mask_path = tmp_path / "mask.nii.gz"
+    with pytest.warns(UserWarning, match="assumed"):
+        save_nifti(
+            vol.replace(mask=np.ones((3, 4, 5), np.uint8)),
+            str(tmp_path / "i.nii.gz"),
+            mask_path=str(mask_path),
+        )
+    paired = load_nifti(str(path), mask_path=str(mask_path))
+    assert paired.mask.sum() == 60
+    coded_mask = tmp_path / "coded_mask.nii.gz"
+    nibabel.save(nibabel.Nifti1Image(np.ones((6, 4, 3), np.uint8), np.eye(4)), str(coded_mask))
+    with pytest.raises(ValueError, match="coded qform or sform"):
+        load_nifti(str(path), mask_path=str(coded_mask), resample_mask=True)
+
+
+def test_export_labels_both_forms_with_the_written_space(tmp_path):
+    scanner, mni = np.diag([1.0, 1.0, 1.0, 1.0]), np.diag([2.0, 2.0, 2.0, 1.0])
+    img = nibabel.Nifti1Image(np.zeros((4, 4, 4), np.float32), None)
+    img.set_qform(scanner, code=1)
+    img.set_sform(mni, code=4)
+    source = tmp_path / "source.nii.gz"
+    nibabel.save(img, str(source))
+    out = tmp_path / "out.nii.gz"
+    save_nifti(load_nifti(str(source)), str(out))
+    header = nibabel.load(str(out)).header
+    assert int(header["sform_code"]) == int(header["qform_code"]) == 4
+    np.testing.assert_allclose(header.get_qform(), mni)
+
+
+@pytest.mark.parametrize("dtype", [np.bool_, np.float16])
+def test_export_converts_unsupported_image_dtypes(tmp_path, dtype):
+    vol = MedVolume(np.ones((3, 4, 5), dtype=dtype), affine=np.eye(4))
+    path = tmp_path / "typed.nii.gz"
+    save_nifti(vol, str(path))
+    np.testing.assert_array_equal(load_nifti(str(path)).image, 1.0)
 
 
 @pytest.mark.parametrize("unit,factor", [("mm", 1), ("meter", 1000), ("micron", 0.001)])

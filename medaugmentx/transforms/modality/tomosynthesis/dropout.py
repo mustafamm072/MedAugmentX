@@ -25,7 +25,7 @@ class SliceDropout(Transform):
     Args:
         num_slices: How many slices to drop. Either an int (fixed count)
             or a ``(low, high)`` inclusive range to sample from.
-        cval: Fill value (defaults to ``0.0``).
+        cval: Fill value (defaults to ``0.0``). Images are returned as float32.
         affect_mask: If True, also zero the mask on the dropped slices.
             Defaults to False — most segmentation pipelines want the
             ground truth preserved.
@@ -66,7 +66,7 @@ class SliceDropout(Transform):
         idxs = self.rng.choice(depth, size=n, replace=False)
 
         def dropout(array: np.ndarray) -> np.ndarray:
-            out = array.copy()
+            out = np.array(array, dtype=np.float32)
             out[idxs] = self.cval
             return out
 

@@ -219,3 +219,21 @@ def test_mapping_returns_updated_spacing_and_metadata():
     assert out["metadata"] == {"processed": True}
     assert sample["metadata"] == {"processed": False}
     assert sample["spacing"] == (2.0, 3.0)
+
+
+def test_integer_dtype_restoration_rounds_instead_of_truncating():
+    from medaugmentx.core import Transform
+
+    class AddOffset(Transform):
+        def __init__(self, offset):
+            super().__init__(p=1.0)
+            self.offset = offset
+
+        def apply(self, volume):
+            return volume.replace(image=volume.image + self.offset)
+
+    for dtype, offset, expected in ((np.uint8, 0.9, 11), (np.int16, -0.1, 10)):
+        sample = {"image": np.full((4, 4), 10, dtype=dtype)}
+        out = SampleTransform(AddOffset(offset), preserve_image_dtype=True)(sample)
+        assert out["image"].dtype == dtype
+        assert (out["image"] == expected).all()

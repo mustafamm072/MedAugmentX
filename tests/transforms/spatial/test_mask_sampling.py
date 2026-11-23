@@ -33,3 +33,12 @@ def test_mask_sampling_preserves_exact_ids_and_background(transform, labels):
     result = transform(volume)
     assert result.mask.dtype == labels.dtype
     np.testing.assert_array_equal(result.mask, labels[result.image.astype(np.intp)])
+
+
+def test_long_double_masks_keep_labels():
+    mask = np.zeros((6, 6), dtype=np.longdouble)
+    mask[2:4, 2:4] = 3
+    volume = MedVolume(np.zeros((6, 6), np.float32), mask)
+    out = RandomAffine(rotation=10.0, seed=0)(volume)
+    assert out.mask.dtype == np.longdouble
+    assert set(np.unique(out.mask)) <= {0, 3}

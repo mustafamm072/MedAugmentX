@@ -81,3 +81,23 @@ class TestMedVolume:
         v = MedVolume(image=np.zeros((4, 4), dtype=np.float32))
         s = repr(v)
         assert "MedVolume" in s and "shape" in s
+
+
+def test_replace_affine_rederives_spacing():
+    volume = MedVolume(np.zeros((4, 4, 4), np.float32), affine=np.eye(4))
+    assert volume.replace(affine=np.diag([2.0, 2.0, 2.0, 1.0])).spacing == (2.0, 2.0, 2.0)
+
+
+def test_keypoint_pruning_commutes_with_flip_and_matches_boxes():
+    from medaugmentx.transforms import RandomFlip
+
+    volume = MedVolume(
+        np.zeros((5, 5), np.float32),
+        keypoints=np.array([[2.0, -0.3], [2.0, 4.3], [2.0, 4.0], [2.0, 0.0]]),
+        keypoint_labels=np.array([0, 1, 2, 3]),
+    )
+    flipped = RandomFlip(axes=("x",), p_per_axis=1.0, seed=0)(volume)
+    kept = volume.remove_out_of_bounds_targets().keypoint_labels
+    kept_after_flip = flipped.remove_out_of_bounds_targets().keypoint_labels
+    np.testing.assert_array_equal(kept, [2, 3])
+    np.testing.assert_array_equal(kept_after_flip, kept)

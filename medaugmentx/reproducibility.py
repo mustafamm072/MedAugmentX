@@ -114,7 +114,7 @@ def _fingerprint(volume: MedVolume) -> str:
                 if arr.dtype.kind == "O"
                 else arr.tobytes()
             )
-    metadata = _make_serialisable(volume.metadata)
+    metadata = _canonical(_make_serialisable(volume.metadata))
     if volume.channels:
         digest.update(b"channels")
         for name, channel in volume.channels.items():
@@ -131,6 +131,22 @@ def _fingerprint(volume: MedVolume) -> str:
         ).encode()
     )
     return digest.hexdigest()
+
+
+def _canonical(value: Any) -> Any:
+    """Deterministic JSON-safe form: ordered sets, tagged non-finite floats."""
+    if isinstance(value, dict):
+        return {str(key): _canonical(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_canonical(item) for item in value]
+    if isinstance(value, (set, frozenset)):
+        items = [_canonical(item) for item in value]
+        return {"__set__": sorted(items, key=lambda item: json.dumps(item, sort_keys=True))}
+    if isinstance(value, float) and not np.isfinite(value):
+        return {"__float__": repr(value)}
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return {"__repr__": str(value)}
 
 
 def record_augmentation(

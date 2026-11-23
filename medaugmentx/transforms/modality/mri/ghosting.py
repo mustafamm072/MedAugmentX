@@ -23,8 +23,10 @@ class GhostingArtifact(Transform):
     attenuated shifted replicas of the anatomy overlaid on the image.
 
     Implementation: add one or more rolled, attenuated copies of the image
-    along the phase-encode axis.  The ghost intensity is expressed relative
-    to the image maximum so the effect is consistent across intensity scales.
+    along the phase-encode axis.  Each replica is the image scaled by the
+    ghost intensity, so the effect is consistent across intensity scales.
+    Shifts are taken modulo the axis length; a replica whose shift wraps to
+    zero would only rescale the image, so it is skipped.
 
     Works on 2-D and 3-D inputs.  For 3-D, ghosting is applied in each axial
     plane (i.e. along the in-plane axis selected by ``phase_encode_axis``).
@@ -67,6 +69,8 @@ class GhostingArtifact(Transform):
             self.ghost_intensity_range = (lo, hi)
 
         if isinstance(ghost_shift, (int, np.integer)):
+            if ghost_shift < 0:
+                raise ValueError("ghost_shift must be >= 0")
             self.ghost_shift_range: tuple[int, int] = (int(ghost_shift), int(ghost_shift))
         else:
             lo_i, hi_i = int(ghost_shift[0]), int(ghost_shift[1])
@@ -95,7 +99,7 @@ class GhostingArtifact(Transform):
         for _ in range(self.num_ghosts):
             intensity = float(self.rng.uniform(*self.ghost_intensity_range))
             shift = int(self.rng.integers(self.ghost_shift_range[0], self.ghost_shift_range[1] + 1))
-            if shift == 0:
+            if shift % image.shape[axis] == 0:
                 continue
             direction = 1 if self.rng.random() < 0.5 else -1
             ghost = np.roll(image, direction * shift, axis=axis).astype(np.float32)

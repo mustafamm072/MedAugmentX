@@ -69,3 +69,30 @@ def test_to_dict_round_trip():
     t2 = MRIMotion(**d["params"])
     assert t2.degrees_range == t.degrees_range
     assert t2.num_range == t.num_range
+
+
+def test_magnitude_ranges_move_in_both_directions():
+    image = np.zeros((32, 32), dtype=np.float32)
+    image[12:20, 12:20] = 1.0
+    volume = MedVolume(image)
+    rows = np.arange(32, dtype=np.float64)[:, None]
+    shifts = []
+    for seed in range(60):
+        out = MRIMotion(degrees=(1.0, 5.0), translation=(2.0, 4.0), num_movements=1, seed=seed)(
+            volume
+        ).image
+        shifts.append(float((out * rows).sum() / out.sum()) - 15.5)
+    shifts = np.asarray(shifts)
+    assert (shifts > 0.1).any() and (shifts < -0.1).any()
+    assert abs(shifts.mean()) < 0.5
+
+
+def test_explicit_signed_range_keeps_its_direction():
+    image = np.zeros((32, 32), dtype=np.float32)
+    image[12:20, 12:20] = 1.0
+    rows = np.arange(32, dtype=np.float64)[:, None]
+    for seed in range(10):
+        out = MRIMotion(degrees=0.0, translation=(-4.0, -2.0), num_movements=1, seed=seed)(
+            MedVolume(image)
+        ).image
+        assert (out * rows).sum() / out.sum() < 15.5

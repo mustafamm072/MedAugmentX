@@ -45,6 +45,22 @@ def _slice_position(ds) -> float | None:
     return None
 
 
+def _is_dicom_candidate(path: str, name: str) -> bool:
+    # DICOMDIR is a media index without pixel data, never a series slice.
+    if name.startswith(".") or name.upper() == "DICOMDIR":
+        return False
+    if name.lower().endswith((".dcm", ".dicom")) or "." not in name:
+        return True
+    # PACS exports often name files by SOP Instance UID ("1.2.840...."), so
+    # also accept any file carrying the Part 10 preamble magic.
+    try:
+        with open(path, "rb") as handle:
+            handle.seek(128)
+            return handle.read(4) == b"DICM"
+    except OSError:
+        return False
+
+
 def _list_dicom_files(path: str) -> list[str]:
     if os.path.isfile(path):
         return [str(path)]
@@ -54,8 +70,7 @@ def _list_dicom_files(path: str) -> list[str]:
         os.path.join(root, name)
         for root, _, names in os.walk(path)
         for name in names
-        if not name.startswith(".")
-        and (name.lower().endswith((".dcm", ".dicom")) or "." not in name)
+        if _is_dicom_candidate(os.path.join(root, name), name)
     ]
     if not files:
         raise FileNotFoundError(f"No DICOM-like files found under {path}")
@@ -226,7 +241,8 @@ def load_dicom_series(
             step = normal * z_spacing
         affine = np.eye(4)
         lps_to_ras = np.diag([-1.0, -1.0, 1.0])
-        # IOP first vector follows columns, second follows rows.
+        # IOP's first cosine points along increasing column index (array x),
+        # its second along increasing row index (array y).
         basis = (
             np.column_stack(
                 [orientation[3:] * pixel_spacing[0], orientation[:3] * pixel_spacing[1], normal]

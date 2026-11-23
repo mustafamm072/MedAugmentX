@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import Any, Union
 
 import numpy as np
@@ -14,6 +15,7 @@ from medaugmentx.core.utils import SeedLike, as_float32, axis_label_to_index, sa
 from medaugmentx.core.volume import MedVolume
 
 Range = Union[float, tuple[float, float]]
+_SCIPY_1D_MATRIX = "The behavior of affine_transform with a 1-D array"
 
 
 class CompressionVariation(Transform):
@@ -27,6 +29,8 @@ class CompressionVariation(Transform):
 
     The image and mask share the same sampled scale; the mask is resampled
     with nearest-neighbour interpolation so label values are preserved.
+    Squeezing exposes background at both ends of the axis: the image is
+    filled with ``0`` and the mask with label ``0``, for every ``order``.
 
     Args:
         scale: Multiplicative scale along the compression axis.  Scalar →
@@ -74,16 +78,20 @@ class CompressionVariation(Transform):
         center = (arr.shape[ax] - 1) / 2.0
         offset = np.zeros(arr.ndim, dtype=np.float64)
         offset[ax] = center * (1.0 - 1.0 / s)
-        mode = "nearest" if order > 0 else "constant"
-        return affine_transform(
-            arr,
-            matrix=matrix,
-            offset=offset,
-            order=order,
-            mode=mode,
-            cval=0.0,
-            output_shape=arr.shape,
-        )
+        mode = "constant"
+        with warnings.catch_warnings():
+            # SciPy < 1.14 warns about the 1-D (diagonal) matrix form on every
+            # call. That form is intended: it keeps the exact zoom/shift path.
+            warnings.filterwarnings("ignore", message=_SCIPY_1D_MATRIX, category=UserWarning)
+            return affine_transform(
+                arr,
+                matrix=matrix,
+                offset=offset,
+                order=order,
+                mode=mode,
+                cval=0.0,
+                output_shape=arr.shape,
+            )
 
     def apply(self, volume: MedVolume) -> MedVolume:
         if not volume.is_3d:

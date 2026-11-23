@@ -250,20 +250,26 @@ Load separately acquired channels as volumes and check that they share a
 patient grid before building a model input.
 
 ```python
-from medaugmentx import Compose, apply_for_sample
+from medaugmentx import Compose, PerChannel, apply_for_sample
 from medaugmentx.io import load_nifti
-from medaugmentx.transforms import ClassBalancedCrop, RandomAffine
+from medaugmentx.transforms import BiasField, ClassBalancedCrop, GaussianNoise, RandomAffine
 
 t1 = load_nifti("t1.nii.gz", mask_path="segmentation.nii.gz")
 flair = load_nifti("flair.nii.gz")
 sample = t1.with_channels({"flair": flair})
-policy = Compose([RandomAffine(rotation=8), ClassBalancedCrop((32, 96, 96))])
+policy = Compose([
+    RandomAffine(rotation=8),
+    ClassBalancedCrop((32, 96, 96)),
+    PerChannel(Compose([BiasField(alpha=0.3), GaussianNoise(std=0.02)])),
+])
 patch = apply_for_sample(policy, sample, seed=42, sample_id=scan_id, epoch=epoch)
 inputs, target = patch.stack_channels("flair"), patch.mask
 ```
 
 Spatial transforms sample one geometry for all channels and shared annotations.
-Apply channel-specific intensity policies to each image before attaching it.
+Intensity transforms act on the primary image unless wrapped in `PerChannel`,
+which gives each image its own draw (or one shared draw with `shared=True`)
+while keeping the whole policy serialisable and replayable.
 To compare policies across training seeds and held-out patients, use
 `compare_segmentation_policies`. [Runnable comparison](examples/compare_segmentation_policies.py)
 
@@ -526,10 +532,11 @@ See [API examples](docs/API_EXAMPLES.md) and the
 
 | Component | Description |
 | --- | --- |
-| `MedVolume` | Container: image + optional mask, keypoints, bounding boxes, spacing, metadata |
+| `MedVolume` | Container: image + optional named channels, mask, keypoints, bounding boxes, spacing, metadata |
 | `Transform` | Abstract base — probability gating, seedable RNG, `to_dict()` |
 | `Compose` | Sequential pipeline with deterministic child seeding |
 | `OneOf` / `SomeOf` | Random selection from a set of transforms |
+| `PerChannel` | Apply an intensity policy to the primary image and named channels, with independent or shared draws |
 | `pipeline_summary` / `iter_pipeline` | Human-readable and programmatic pipeline inspection |
 | `VolumeValidator` | Clinical-plausibility checks (finite, non-constant, mask sync, intensity bounds, foreground/label preservation, drift) |
 | `Guard` | Wrap a transform/pipeline; validate every output and `raise`/`warn`/`revert`/`retry` on failure |

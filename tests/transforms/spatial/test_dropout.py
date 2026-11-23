@@ -78,3 +78,10 @@ def test_to_dict_round_trip():
     assert t2.num_range == t.num_range
     assert t2.hole_size == t.hole_size
     assert t2.fill_mask == t.fill_mask
+
+
+def test_integer_image_fill_is_not_wrapped():
+    volume = MedVolume(np.full((20, 20), 7, dtype=np.uint16))
+    out = CoarseDropout(num_holes=2, hole_size=(0.2, 0.3), fill_value=-1.0, seed=0)(volume)
+    assert out.image.dtype == np.float32
+    assert (out.image == -1.0).any() and out.image.max() == 7

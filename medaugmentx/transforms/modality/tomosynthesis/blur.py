@@ -34,8 +34,6 @@ class LimitedAngleBlur(Transform):
         arc_degrees: Either a fixed arc angle or a ``(low, high)`` range.
         base_sigma: Reference sigma at ``reference_arc_deg``.
         reference_arc_deg: Angle at which sigma equals ``base_sigma``.
-        mask_blur_warning: Skip blurring the mask (always); this attribute
-            documents the policy.
         p: Probability of applying.
         seed: RNG seed.
 

@@ -132,3 +132,11 @@ def test_kspace_to_dict_round_trip():
     t2 = KSpaceDropout(**d["params"])
     assert t2.dropout_range == t.dropout_range
     assert t2.phase_encode_axis == t.phase_encode_axis
+
+
+def test_ghost_shift_wrapping_to_identity_is_skipped():
+    image = np.random.default_rng(1).random((16, 16)).astype(np.float32)
+    out = GhostingArtifact(ghost_intensity=0.1, ghost_shift=16, seed=0)(MedVolume(image))
+    np.testing.assert_array_equal(out.image, image)
+    with pytest.raises(ValueError):
+        GhostingArtifact(ghost_shift=-5)

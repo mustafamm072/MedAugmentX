@@ -21,7 +21,7 @@ spec.loader.exec_module(benchmark)
 
 @pytest.mark.parametrize("shape", [(16, 16), (8, 16, 16)])
 def test_benchmark_measures_every_registered_leaf(shape):
-    names = set(REGISTRY) - {"Compose", "OneOf", "SomeOf", "Guard"}
+    names = set(REGISTRY) - {"Compose", "OneOf", "SomeOf", "Guard", "PerChannel"}
     if len(shape) == 2:
         names -= benchmark._REQUIRE_3D
     for name in sorted(names):

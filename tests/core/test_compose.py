@@ -108,3 +108,13 @@ def test_oneof_normalizes_large_finite_weights():
 
     t = OneOf([GaussianNoise(), GaussianNoise()], weights=[1e308, 1e308])
     np.testing.assert_array_equal(t.weights, [0.5, 0.5])
+
+
+def test_oneof_weights_serialise_without_drift():
+    from medaugmentx.serialization import from_json, to_json
+    from medaugmentx.transforms import GaussianNoise
+
+    weights = [0.4773166163609316, 0.018697076281380332, 0.40619889392830116, 0.09778741342938686]
+    first = to_json(OneOf([GaussianNoise() for _ in weights], weights=weights, seed=0))
+    second = to_json(from_json(first))
+    assert to_json(from_json(second)) == second == first

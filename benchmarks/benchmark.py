@@ -20,7 +20,7 @@ import scipy
 from medaugmentx import MedVolume, __version__
 from medaugmentx.serialization import REGISTRY
 
-_SKIP = {"Compose", "OneOf", "SomeOf", "Guard"}
+_SKIP = {"Compose", "OneOf", "SomeOf", "Guard", "PerChannel"}
 _REQUIRE_3D = {
     "SlabShift",
     "LimitedAngleBlur",

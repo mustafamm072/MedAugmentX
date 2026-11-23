@@ -22,6 +22,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   field of view, avoiding missed mismatches at large patient-space origins.
 - Preserve large integer-valued labels during NIfTI export and reject masks
   that cannot be written losslessly as signed or unsigned integer labels.
+- Silence SciPy's obsolete 1-D matrix `UserWarning`, emitted on every
+  `CompressionVariation` call with SciPy < 1.14 (including all Python 3.9
+  installs), without changing the exact sampling path or seeded outputs.
+- JSON and YAML loaders now emit the same migration warning for unversioned
+  pre-1.0 policies.
+- `MRIMotion` treats non-negative tuple ranges (including its defaults and the
+  MRI preset) as magnitudes with a random sign per draw. Previously every
+  motion state rotated and shifted in the positive direction, biasing the
+  image against its fixed mask. Tuples with a negative bound remain explicit
+  signed ranges; seeded MRIMotion outputs change.
+- `GhostingArtifact` skips replicas whose shift is a multiple of the axis
+  length (which only rescaled the image) and rejects negative scalar shifts.
+- `CompressionVariation` fills exposed borders with 0 for every `order`, matching
+  the mask's label 0, instead of edge-replicating tissue the mask excludes.
+- `CoarseDropout`, `SliceDropout` and `SlabShift` return float32 images so
+  fill values are no longer truncated or wrapped by integer input dtypes.
+- `OneOf` serialises the weights it was given, so re-exporting a loaded policy
+  no longer perturbs low bits of normalised weights and its `policy_sha256`.
+- `remove_out_of_bounds_targets` keeps keypoints within `[0, size - 1]`, the
+  same interval used to clip boxes, so pruning commutes with flips.
+- `MedVolume.replace(affine=...)` re-derives spacing from the new affine
+  instead of rejecting it against the old spacing.
+- Augmentation records canonicalise metadata before hashing, so non-finite
+  values no longer abort recording and set-valued metadata hashes identically
+  in every process.
+- Long-double masks keep their labels in spatial transforms on platforms where
+  long double is 8 bytes (macOS arm64, Windows).
+- DICOM series discovery accepts files named by SOP Instance UID when they
+  carry the Part 10 `DICM` preamble and skips `DICOMDIR` index files, which
+  previously caused missed slices or strict-mode failures.
+- NIfTI files with neither a coded qform nor sform load with unknown geometry
+  (`affine=None`) instead of nibabel's invented fallback affine, and
+  assumed-geometry export writes codes 0. Export labels both forms with the
+  code of the space the written matrix came from, so a scanner qform code no
+  longer describes an MNI matrix. Boolean and float16 images export as uint8
+  and float32.
+- Framework adapters round, rather than truncate, floating results when
+  `preserve_image_dtype=True` restores an integer dtype.
 
 ### Added
 
@@ -39,6 +77,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   channel-first stacking and reproducible replay.
 - Paired segmentation policy evaluation across matched seeds and held-out
   patients, including patient-level split checks and bootstrap intervals.
+- `PerChannel` wrapper that applies an intensity policy to the primary image
+  and selected named channels, with independent or shared (`shared=True`)
+  draws. Keeps multi-channel intensity augmentation inside one policy that
+  serialises, inspects, records, and replays like `Guard`; spatial children are
+  rejected because spatial transforms already move every channel together.
 
 ## [1.0.0] — 2026-10-25
 

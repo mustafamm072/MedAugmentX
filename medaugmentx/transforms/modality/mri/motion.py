@@ -31,10 +31,12 @@ class MRIMotion(Transform):
     annotation stays valid.
 
     Args:
-        degrees: In-plane rotation magnitude per motion state, in degrees.
-            Scalar → symmetric ``(-v, +v)``; tuple → explicit ``(lo, hi)``.
-        translation: In-plane translation per motion state, in pixels.
-            Scalar → symmetric; tuple → explicit ``(lo, hi)``.
+        degrees: In-plane rotation per motion state, in degrees. Scalar →
+            symmetric ``(-v, +v)``. A non-negative tuple ``(lo, hi)`` is a
+            magnitude range: each draw also gets a random sign, so motion is
+            unbiased. A tuple with a negative bound is an explicit signed range.
+        translation: In-plane translation per motion state, in pixels, with the
+            same scalar, magnitude-range and signed-range rules as ``degrees``.
         num_movements: Number of additional motion states to blend in.
             Int (fixed) or ``(low, high)`` inclusive range.
         p: Probability of applying.
@@ -70,15 +72,23 @@ class MRIMotion(Transform):
         sh[-1] = dx
         return shift(rotated, sh, order=1, mode="reflect")
 
+    def _draw(self, bounds: tuple[float, float]) -> float:
+        value = float(self.rng.uniform(*bounds))
+        # Non-negative tuples are magnitude ranges; without a random sign every
+        # motion state would rotate and shift the same way.
+        if bounds[0] >= 0 and bounds[1] > 0 and self.rng.random() < 0.5:
+            value = -value
+        return value
+
     def apply(self, volume: MedVolume) -> MedVolume:
         image = as_float32(volume.image)
         n = int(self.rng.integers(self.num_range[0], self.num_range[1] + 1))
 
         acc = image.copy()
         for _ in range(n):
-            angle = float(self.rng.uniform(*self.degrees_range))
-            dy = float(self.rng.uniform(*self.translation_range))
-            dx = float(self.rng.uniform(*self.translation_range))
+            angle = self._draw(self.degrees_range)
+            dy = self._draw(self.translation_range)
+            dx = self._draw(self.translation_range)
             acc += self._move(image, angle, dy, dx)
         out = acc / float(n + 1)
         return volume.replace(image=out.astype(np.float32, copy=False))

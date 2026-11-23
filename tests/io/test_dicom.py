@@ -223,3 +223,18 @@ def test_unreadable_candidates_are_reported(tmp_path):
     with pytest.warns(UserWarning, match="Skipped"):
         volume = load_dicom_series(str(tmp_path), strict=False)
     assert len(volume.metadata["skipped_files"]) == 1
+
+
+def test_uid_named_slices_and_dicomdir_are_handled(tmp_path):
+    series_uid = generate_uid()
+    for i in range(3):
+        _write_dicom_slice(
+            tmp_path / f"1.2.826.0.1.3680043.8.498.{i + 10}",
+            np.full((4, 4), 1024 + i, dtype=np.uint16),
+            series_uid=series_uid,
+            position=float(i),
+        )
+    (tmp_path / "DICOMDIR").write_bytes(b"\0" * 132)
+    (tmp_path / "notes.txt").write_text("not a slice")
+    vol = load_dicom_series(str(tmp_path))
+    assert vol.shape == (3, 4, 4)

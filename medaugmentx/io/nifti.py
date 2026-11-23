@@ -33,7 +33,9 @@ def load_nifti(
 
     File axes are reversed into array order. Spatial units are converted to mm;
     unknown units are explicitly assumed mm with a warning. Source orientation
-    is preserved, not canonicalized. Four-dimensional time/channel data is
+    is preserved, not canonicalized. Files with neither a coded qform nor a
+    coded sform carry no patient coordinates, so they load with ``affine=None``
+    and spacing from the voxel sizes. Four-dimensional time/channel data is
     unsupported except for a trailing singleton dimension.
     Returned image/mask arrays own their data and retain no source-file mappings.
 
@@ -41,7 +43,8 @@ def load_nifti(
         path: NIfTI image filename.
         dtype: Output intensity dtype, or None to retain the proxy's scaled dtype.
         mask_path: Optional registered label-map NIfTI. The default requires
-            matching shape and world coordinates across the grid (within 1e-4 mm).
+            matching shape and world coordinates across the grid (within 1e-4 mm),
+            or matching shape and spacing when either file has no coded geometry.
         resample_mask: For a grid mismatch, use the label map's header to sample
             its labels onto the image grid. Enable this only for files already
             sharing a patient coordinate system. Uses nearest-neighbour with
@@ -65,29 +68,42 @@ def load_nifti(
             "NIfTI spatial units are unknown; assuming millimetres", UserWarning, stacklevel=2
         )
     factor = {"mm": 1.0, "meter": 1000.0, "micron": 0.001, "unknown": 1.0}[unit]
-    native = np.array(source.affine, dtype=float)
-    native[:3, :] *= factor
-    affine = native @ axis_permutation(data.ndim)
-    metadata = {
+    qform_code = int(source.header["qform_code"])
+    sform_code = int(source.header["sform_code"])
+    metadata: dict[str, Any] = {
         "source": str(path),
         "modality": None,
-        "affine": native,
         "nifti_spatial_units": unit,
-        "nifti_qform_code": int(source.header["qform_code"]),
-        "nifti_sform_code": int(source.header["sform_code"]),
+        "nifti_qform_code": qform_code,
+        "nifti_sform_code": sform_code,
     }
+    affine = None
+    spacing: tuple[float, ...] = ()
+    if qform_code or sform_code:
+        native = np.array(source.affine, dtype=float)
+        native[:3, :] *= factor
+        affine = native @ axis_permutation(data.ndim)
+        metadata["affine"] = native
+    else:
+        # nibabel's fallback affine for uncoded files is invented, not patient
+        # geometry; keep only the voxel sizes, in array order.
+        zooms = source.header.get_zooms()[: data.ndim]
+        spacing = tuple(float(z) * factor for z in reversed(zooms))
     # Transposing NIfTI's disk layout can already be C-contiguous, so
     # ascontiguousarray alone retains a memmap and locks the file on Windows.
     # Copy once, combining dtype conversion with ownership of the array.
     image = np.array(data.transpose(), dtype=dtype, order="C", copy=True)
-    volume = MedVolume(image, metadata=metadata, affine=affine)
+    volume = MedVolume(image, spacing=spacing, metadata=metadata, affine=affine)
     if mask_path is not None:
         mask_volume = load_nifti(mask_path, dtype=None)
-        assert mask_volume.affine is not None and volume.affine is not None
         labels = mask_volume.image
-        if mask_volume.shape != volume.shape or not grids_match(
-            mask_volume.affine, volume.affine, volume.shape
-        ):
+        if mask_volume.shape != volume.shape:
+            same_grid = False
+        elif mask_volume.affine is None or volume.affine is None:
+            same_grid = np.allclose(mask_volume.spacing, volume.spacing, rtol=1e-5, atol=1e-6)
+        else:
+            same_grid = grids_match(mask_volume.affine, volume.affine, volume.shape)
+        if not same_grid:
             if not resample_mask:
                 raise ValueError(
                     "NIfTI image and mask must have the same shape and patient-space grid"
@@ -104,6 +120,7 @@ def load_nifti(
             # Validate before sampling so an invalid label cannot disappear
             # during a crop or downsampling.
             mask_volume.replace(mask=labels)
+            assert mask_volume.affine is not None and volume.affine is not None
             _, matrix, offset = grid_pull(mask_volume.affine, volume.affine, volume.shape)
             aligned = sample_grid_mask(labels, matrix, offset, volume.shape)
             if not aligned.any() and labels.any():
@@ -123,8 +140,11 @@ def save_nifti(
     """Export current geometry, setting mm units and coherent qform/sform.
 
     Shear is preserved in sform; qform is disabled when it cannot represent the
-    grid without approximation. Unknown patient geometry uses an explicitly
-    assumed axis-aligned grid with a warning, or raises in strict export mode.
+    grid without approximation. Both forms carry the code of the space the
+    affine came from (the loaded sform's, else the qform's, else scanner).
+    Unknown patient geometry uses an explicitly assumed axis-aligned grid with
+    a warning and codes 0 (no patient coordinates), or raises in strict mode.
+    Boolean and float16 images are written as uint8 and float32.
 
     Args:
         volume: Volume to write.
@@ -150,7 +170,11 @@ def save_nifti(
         else:
             raise ValueError("NIfTI mask labels must fit int64 or uint64 for lossless export")
     affine = volume.affine
+    code = int(
+        volume.metadata.get("nifti_sform_code") or volume.metadata.get("nifti_qform_code") or 1
+    )
     if affine is None:
+        code = 0
         if not allow_assumed_geometry:
             raise ValueError("Patient geometry is unknown; supply an affine before export")
         warnings.warn(
@@ -166,14 +190,20 @@ def save_nifti(
     def write(array: np.ndarray, destination: str) -> None:
         img = nib.Nifti1Image(array.transpose(), native, dtype=array.dtype)
         img.header.set_xyzt_units("mm")
-        img.set_sform(native, code=volume.metadata.get("nifti_sform_code", 1) or 1)
-        if orthogonal:
-            img.set_qform(native, code=volume.metadata.get("nifti_qform_code", 1) or 1)
+        img.set_sform(native, code=code)
+        # One matrix is written to both forms, so both must name its space.
+        if orthogonal and code:
+            img.set_qform(native, code=code)
         else:
             img.set_qform(None, code=0)
         nib.save(img, str(destination))
 
-    write(volume.image, path)
+    image = volume.image
+    if image.dtype == np.bool_:
+        image = image.astype(np.uint8)
+    elif image.dtype.kind == "f" and image.dtype.itemsize < 4:
+        image = image.astype(np.float32)
+    write(image, path)
     if mask_path is not None:
         assert labels is not None
         write(labels, mask_path)

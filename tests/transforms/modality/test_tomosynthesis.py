@@ -118,3 +118,13 @@ class TestAnisotropicElastic:
         a = AnisotropicElastic(seed=42)(dbt_vol)
         b = AnisotropicElastic(seed=42)(dbt_vol)
         np.testing.assert_array_equal(a.image, b.image)
+
+
+@pytest.mark.parametrize("dtype", [np.uint16, np.int16, np.uint8])
+def test_slab_and_slice_fill_is_not_truncated_by_integer_input(dtype):
+    volume = MedVolume(np.full((4, 3, 3), 7, dtype=dtype))
+    shifted = SlabShift(max_shift=(1, 1), cval=-0.5, seed=0)(volume)
+    dropped = SliceDropout(num_slices=1, cval=-0.5, seed=0)(volume)
+    for out in (shifted, dropped):
+        assert out.image.dtype == np.float32
+        assert (out.image == -0.5).sum() == 9

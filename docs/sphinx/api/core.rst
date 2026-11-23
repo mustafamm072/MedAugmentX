@@ -3,7 +3,7 @@ Core
 
 .. code-block:: python
 
-   from medaugmentx import Compose, MedVolume, OneOf, SomeOf, Transform
+   from medaugmentx import Compose, MedVolume, OneOf, PerChannel, SomeOf, Transform
 
 The data container
 ------------------
@@ -45,6 +45,11 @@ numbers.
 .. autoclass:: medaugmentx.OneOf
 
 .. autoclass:: medaugmentx.SomeOf
+
+``PerChannel`` wraps an intensity policy so it also augments the named
+registered channels, with independent or shared draws per image.
+
+.. autoclass:: medaugmentx.PerChannel
 
 Coordinate maps
 ---------------

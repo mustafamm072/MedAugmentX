@@ -77,7 +77,7 @@ class CoarseDropout(Transform):
         if n == 0:
             return volume
 
-        new_image, channels = volume._map_images(lambda array: array.copy())
+        new_image, channels = volume._map_images(lambda array: np.array(array, dtype=np.float32))
         new_mask = None
         if volume.mask is not None and self.fill_mask:
             new_mask = volume.mask.copy()

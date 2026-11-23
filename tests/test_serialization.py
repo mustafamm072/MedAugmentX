@@ -234,6 +234,7 @@ def test_registry_contains_all_known_transforms():
         "ScatterSimulation",
         "GridArtifact",
         "Guard",
+        "PerChannel",
     }
     assert expected.issubset(set(REGISTRY.keys()))
 
@@ -347,7 +348,7 @@ def test_every_builtin_preserves_seed_and_draw_sequence(name, cls):
     args = {"seed": np.int64(17), "p": 0.7}
     if name in ("Compose", "OneOf", "SomeOf"):
         args["transforms"] = [GaussianNoise()]
-    elif name == "Guard":
+    elif name in ("Guard", "PerChannel"):
         args["transform"] = GaussianNoise()
     elif name in ("Resize", "Pad", "CenterCrop", "AnatomicCrop", "ClassBalancedCrop"):
         args["size"] = (4, 8, 8)

@@ -9,6 +9,7 @@ from typing import Any
 import numpy as np
 
 from medaugmentx.core.base import Transform
+from medaugmentx.serialization import WRAPPER_NAMES
 
 
 @dataclass(frozen=True)
@@ -87,7 +88,7 @@ def _walk_dict(d: Mapping[str, Any], path: tuple[int, ...]) -> Iterator[Pipeline
 
     params = dict(raw_params)
     children = params.pop("transforms", None)
-    if name == "Guard" and "transform" in params:
+    if name in WRAPPER_NAMES and "transform" in params:
         children = [params.pop("transform")]
     yield PipelineStep(path=path, name=name, params=params, depth=len(path))
 

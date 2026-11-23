@@ -9,6 +9,7 @@ from medaugmentx.core import (
     Compose,
     MedVolume,
     OneOf,
+    PerChannel,
     SomeOf,
     Transform,
 )
@@ -45,6 +46,7 @@ __all__ = [
     "Compose",
     "OneOf",
     "SomeOf",
+    "PerChannel",
     "PipelineStep",
     "iter_pipeline",
     "pipeline_summary",

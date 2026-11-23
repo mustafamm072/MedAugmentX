@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import pytest
 
@@ -53,6 +55,15 @@ def test_compression_deterministic(dbt_vol):
     a = CompressionVariation(scale=(0.85, 1.15), seed=4)(dbt_vol)
     b = CompressionVariation(scale=(0.85, 1.15), seed=4)(dbt_vol)
     np.testing.assert_array_equal(a.image, b.image)
+
+
+def test_compression_emits_no_scipy_matrix_warning(dbt_vol):
+    # SciPy < 1.14 (Python 3.9 and the minimum-dependency job) warns about the
+    # diagonal matrix form on every call unless the transform silences it.
+    volume = dbt_vol.replace(mask=(dbt_vol.image > dbt_vol.image.mean()).astype(np.uint8))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        CompressionVariation(scale=(0.8, 0.9), seed=1)(volume)
 
 
 def test_compression_invalid_params_raise():
@@ -123,3 +134,12 @@ def test_recon_to_dict_round_trip():
     assert t2.amplitude_range == t.amplitude_range
     assert t2.plane_range == t.plane_range
     assert t2.decay == t.decay
+
+
+@pytest.mark.parametrize("order", [0, 1, 3])
+def test_compression_border_fill_matches_mask_for_every_order(order):
+    image = np.full((1, 10, 4), 100.0, dtype=np.float32)
+    volume = MedVolume(image, np.ones(image.shape, dtype=np.uint8))
+    out = CompressionVariation(scale=0.7, axis="y", order=order, seed=0)(volume)
+    np.testing.assert_array_equal(out.image > 50, out.mask > 0)
+    assert not out.mask[0, 0].any() and not out.mask[0, -1].any()
