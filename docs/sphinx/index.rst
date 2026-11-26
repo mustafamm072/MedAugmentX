@@ -52,6 +52,9 @@ Where to start
    * - Work through a full MRI, CT, or DBT example
      - :doc:`Tutorial notebooks <../../notebooks/README>`
 
+   * - Design and stress-test a policy on your scans
+     - :doc:`Policy Studio <../STUDIO>`
+
    * - Make results reproducible in a paper
      - :doc:`Research guide <../RESEARCH_GUIDE>`
 
@@ -109,6 +112,7 @@ finite, non-collapsed, labels intact — and can raise, warn, revert, or retry.
    :caption: Guides
    :hidden:
 
+   Policy Studio <../STUDIO>
    Version 1 migration <../MIGRATION_V1>
    Research & reproducibility <../RESEARCH_GUIDE>
    Commercial adoption <../COMMERCIAL_ADOPTION>

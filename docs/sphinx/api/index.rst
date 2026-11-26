@@ -32,6 +32,10 @@ the semantics that span more than one class.
      - Plausibility checks on augmented volumes, and the guard that enforces
        them inside a pipeline. Also covers held-out segmentation comparisons.
 
+   * - :doc:`studio`
+     - The local Policy Studio: :func:`~medaugmentx.studio.launch`, the server,
+       and the session API behind it.
+
    * - :doc:`io`
      - DICOM and NIfTI readers, framework adapters for PyTorch, MONAI, and
        TorchIO, and the synthetic phantoms used throughout the docs.
@@ -44,3 +48,4 @@ the semantics that span more than one class.
    pipelines
    validation
    io
+   studio

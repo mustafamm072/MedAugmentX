@@ -10,6 +10,7 @@ recursive-include examples *.md *.py
 recursive-include notebooks *.md *.py *.ipynb
 recursive-include benchmarks *.md *.py
 recursive-include tests *.py
+recursive-include medaugmentx/studio/static *
 global-exclude __pycache__ *.py[cod] .DS_Store
 
 recursive-include resources *.json *.md

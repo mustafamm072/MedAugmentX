@@ -87,6 +87,7 @@ jobs:
           python -m venv /tmp/medaugmentx-wheel
           wheel=$(ls dist/*.whl)
           /tmp/medaugmentx-wheel/bin/python -m pip install "${wheel}[test,viz]"
+          /tmp/medaugmentx-wheel/bin/medaugmentx studio --help
           mkdir -p /tmp/medaugmentx-wheel-check
           cp -R tests /tmp/medaugmentx-wheel-check/tests
           cp pyproject.toml /tmp/medaugmentx-wheel-check/pyproject.toml

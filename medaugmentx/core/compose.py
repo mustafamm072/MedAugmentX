@@ -25,6 +25,11 @@ class Compose(Transform):
     top-level seed. Fresh equivalent pipelines reproduce the same sequence
     of draws in the same software environment; successive calls advance RNG
     state. Serialisation stores configuration, not the current RNG state.
+
+    Args:
+        transforms: Transforms to apply in order.
+        p: Probability of applying the whole sequence.
+        seed: Seed for the children's derived streams.
     """
 
     def __init__(
@@ -80,6 +85,12 @@ class OneOf(Transform):
 
     The container's ``p`` controls whether *any* child runs at all. When
     weights are provided they are normalised; otherwise the choice is uniform.
+
+    Args:
+        transforms: Candidate transforms; the chosen one runs regardless of its ``p``.
+        weights: Optional non-negative relative weights, one per transform.
+        p: Probability of applying any child.
+        seed: Seed for the choice and the children's derived streams.
     """
 
     def __init__(
@@ -145,6 +156,12 @@ class SomeOf(Transform):
 
     ``n`` may be an int or a ``(low, high)`` inclusive range — when a range,
     a value is sampled per call.
+
+    Args:
+        transforms: Candidate transforms; chosen ones run regardless of their ``p``.
+        n: Number of transforms to apply, or an inclusive ``(low, high)`` range.
+        p: Probability of applying the container.
+        seed: Seed for the selection and the children's derived streams.
     """
 
     def __init__(

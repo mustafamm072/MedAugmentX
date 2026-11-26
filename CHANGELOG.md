@@ -63,6 +63,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Policy Studio** (`medaugmentx studio`, `python -m medaugmentx.studio`, or
+  `medaugmentx.studio.launch`): a local web application for building policies
+  from presets or a searchable transform catalog with nested containers,
+  type-aware parameter editing, model cards and undo/redo; previewing input and
+  augmented slices with mask, landmark and box overlays, a difference view and
+  `apply_for_sample`-identical seeding; rendering draw galleries; stress-testing
+  hundreds of draws for validator rejections, exceptions, timing, output shapes
+  and observed step rates; and exporting hash-verified JSON, YAML or Python and
+  replay records. Loads NIfTI, NumPy and DICOM data, uploads and registered
+  channels. Standard library only; binds to localhost behind a per-session
+  token with Host/Origin checks and a strict Content-Security-Policy, and loads
+  no remote assets. See `docs/STUDIO.md`.
+- `medaugmentx` console script with a `studio` subcommand.
+- `Args:` documentation for `Compose`, `OneOf` and `SomeOf`.
 - `ResampleToSpacing` for exact millimetre spacing with centre-aligned output
   grids, image antialiasing, nearest-neighbour masks, coherent patient geometry
   and geometric targets, JSON/YAML and replay support, and an optional output

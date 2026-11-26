@@ -131,6 +131,9 @@ pip install "medaugmentx[torchio]"    # TorchIO subjects
 pip install "medaugmentx[frameworks]" # PyTorch + MONAI + TorchIO
 ```
 
+The `medaugmentx studio` command (the local Policy Studio) is included in the
+core install; use the `io` extra to open DICOM or NIfTI files in it.
+
 Verify the installation:
 
 ```python
@@ -364,6 +367,35 @@ objects with `path`, `name`, `params`, and `depth`.
 
 ---
 
+## Policy Studio
+
+Design, preview, and stress-test a policy on your own scans in a local web app,
+then export exactly what your training code loads. It ships with the package,
+needs no extra dependencies, binds to localhost behind a per-session token, and
+loads nothing from the network, so images stay on your machine.
+
+```bash
+medaugmentx studio --image t1.nii.gz --mask seg.nii.gz   # or --phantom mri
+```
+
+- **Build** policies from presets or a searchable transform palette, with nested
+  `Compose`/`OneOf`/`SomeOf`/`Guard`/`PerChannel`, type-aware parameter editing,
+  model cards, and undo/redo.
+- **Preview** input and augmented slices side by side with mask, landmark, and
+  box overlays, a difference view, and synchronised zoom. Draws use the same
+  `seed`/`sample_id`/`epoch` seeding as `apply_for_sample`, so you can see
+  exactly what training saw.
+- **Stress-test** hundreds of draws for validator rejections, exceptions,
+  timing, output shapes, and how often each step actually ran.
+- **Export** hash-verified JSON, YAML, or readable Python; download a replay
+  record for any draw.
+
+From a notebook, `studio = launch(policy, volume, block=False)` opens the same
+app and `studio.current_policy()` returns the edited policy. See the
+[Policy Studio guide](docs/STUDIO.md).
+
+---
+
 ## Detection & landmark targets
 
 `MedVolume` can carry **keypoints** (landmark coordinates) and **bounding
@@ -538,6 +570,7 @@ See [API examples](docs/API_EXAMPLES.md) and the
 | `OneOf` / `SomeOf` | Random selection from a set of transforms |
 | `PerChannel` | Apply an intensity policy to the primary image and named channels, with independent or shared draws |
 | `pipeline_summary` / `iter_pipeline` | Human-readable and programmatic pipeline inspection |
+| `medaugmentx studio` / `studio.launch` | Local Policy Studio for designing, previewing, and stress-testing policies |
 | `VolumeValidator` | Clinical-plausibility checks (finite, non-constant, mask sync, intensity bounds, foreground/label preservation, drift) |
 | `Guard` | Wrap a transform/pipeline; validate every output and `raise`/`warn`/`revert`/`retry` on failure |
 

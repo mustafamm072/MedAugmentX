@@ -6,6 +6,9 @@ layout and the rules each layer follows.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
+│ Policy Studio  (medaugmentx/studio/, `medaugmentx studio`)       │
+│   catalog · session · render · stdlib HTTP server · static UI   │
+├─────────────────────────────────────────────────────────────────┤
 │ Interop  (medaugmentx/interop/)                                  │
 │   SampleTransform · TorchTransform · MonaiMapTransform · TorchIO │
 ├─────────────────────────────────────────────────────────────────┤
@@ -374,3 +377,31 @@ derived RNG stream. Because it is a `Transform`, it nests in the pipeline
 containers and round-trips through the serialisation `REGISTRY` — `from_dict`
 rebuilds its single wrapped transform and reconstructs the validator from its
 plain-dict config.
+
+---
+
+## 12. Policy Studio (`medaugmentx/studio/`)
+
+The studio is an application layer on top of every other layer; nothing below
+imports it. It is split so each part can be tested without a browser:
+
+- `catalog.py` derives the editor's metadata from `REGISTRY`, constructor
+  signatures, `Args:` docstring sections, and the packaged model cards. A
+  registered transform appears in the studio with no further wiring, so a
+  missing parameter description is caught by the studio tests.
+- `session.py` (`StudioSession`) owns the loaded volume and the edited policy in
+  its canonical `to_dict()` form. Previews reseed a compiled copy with
+  `seed_for_sample`, exactly like `apply_for_sample`, and record which steps ran
+  through the `ACTIVE_TRACE` context variable used by `record_augmentation`.
+  The last draw is cached by policy, draw options, and a volume version so
+  slice and display changes do not recompute the augmentation.
+- `render.py` slices, windows, and overlays labels, and encodes PNG with
+  `zlib` alone, so no plotting dependency is needed.
+- `server.py` is a `ThreadingHTTPServer` with a JSON API. It binds to loopback,
+  requires a per-session token, checks Host and Origin headers, streams uploads
+  to a private temporary folder, and serves a strict Content-Security-Policy.
+- `static/` holds a dependency-free HTML/CSS/JS front-end packaged as
+  `package-data`; it never fetches remote assets.
+
+`medaugmentx/cli.py` provides the `medaugmentx studio` console script, and
+`python -m medaugmentx.studio` runs the same command.

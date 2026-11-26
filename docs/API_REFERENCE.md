@@ -30,7 +30,11 @@ from medaugmentx.serialization import ...# REGISTRY, register_transform, to_json
 from medaugmentx.interop import ...      # SampleTransform, TorchTransform, MonaiMapTransform, TorchIOTransform
 from medaugmentx.io import ...           # load_dicom_series, load_nifti, save_nifti
 from medaugmentx.phantoms import ...     # mri_phantom, ct_phantom, xray_phantom, dbt_phantom
+from medaugmentx.studio import ...       # launch, StudioServer, StudioSession (Policy Studio)
 ```
+
+The `medaugmentx` console script (`medaugmentx studio`) is public as well; see
+[Policy Studio](STUDIO.md).
 
 One exception is `medaugmentx.core.geometry`, which is public for authors of
 custom spatial transforms — see [Geometric targets](#geometric-targets).

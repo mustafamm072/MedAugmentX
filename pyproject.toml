@@ -78,6 +78,9 @@ dev = [
     "mypy>=1.5",
 ]
 
+[project.scripts]
+medaugmentx = "medaugmentx.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/mustafamm072/MedAugmentX"
 Documentation = "https://mustafamm072.github.io/MedAugmentX/"
@@ -91,7 +94,7 @@ include = ["medaugmentx*"]
 exclude = ["tests*", "examples*", "docs*"]
 
 [tool.setuptools.package-data]
-medaugmentx = ["py.typed", "resources/*.json"]
+medaugmentx = ["py.typed", "resources/*.json", "studio/static/*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "medaugmentx._version.__version__"}

@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MedAugmentX Policy Studio</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/studio.css">
+  <script src="/static/studio.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="/static/favicon.svg" alt="" width="22" height="22">
+      <span class="brand-name">MedAugmentX <strong>Policy Studio</strong></span>
+      <span class="version" id="version"></span>
+    </div>
+    <button class="data-chip" id="data-chip" type="button" title="Loaded data">No data loaded</button>
+    <div class="topbar-actions">
+      <span class="policy-status" id="policy-status" role="status"></span>
+      <button type="button" class="btn" id="btn-import">Import</button>
+      <button type="button" class="btn primary" id="btn-export">Export</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel policy-panel" aria-label="Policy">
+      <div class="panel-head">
+        <h2>Policy</h2>
+        <div class="panel-tools">
+          <select id="preset-select" aria-label="Start from preset">
+            <option value="">Start from preset…</option>
+          </select>
+          <button type="button" class="btn ghost small" id="btn-clear" title="Remove every step">Clear</button>
+        </div>
+      </div>
+      <div class="preset-options" id="preset-options" hidden></div>
+      <div class="tree" id="tree" role="tree" aria-label="Policy steps"></div>
+      <div class="panel-foot">
+        <button type="button" class="btn wide" id="btn-add-root">+ Add step</button>
+        <button type="button" class="btn ghost small" id="btn-undo" title="Undo (Ctrl+Z)" disabled>Undo</button>
+        <button type="button" class="btn ghost small" id="btn-redo" title="Redo (Ctrl+Shift+Z)" disabled>Redo</button>
+      </div>
+    </section>
+
+    <section class="panel stage" aria-label="Workspace">
+      <nav class="tabs" role="tablist">
+        <button type="button" role="tab" class="tab active" data-tab="preview">Preview</button>
+        <button type="button" role="tab" class="tab" data-tab="gallery">Gallery</button>
+        <button type="button" role="tab" class="tab" data-tab="stress">Stress test</button>
+        <button type="button" role="tab" class="tab" data-tab="data">Data</button>
+      </nav>
+
+      <div class="tab-page active" id="tab-preview">
+        <div class="controls">
+          <fieldset class="control-group" aria-label="Random draw">
+            <label>Seed <input type="text" id="seed" inputmode="numeric" pattern="[0-9]*" value="0" spellcheck="false"></label>
+            <label>Sample ID <input type="text" id="sample-id" value="studio" spellcheck="false"></label>
+            <label>Epoch <input type="number" id="epoch" min="0" step="1" value="0"></label>
+            <label>Draw <input type="number" id="draw-index" min="0" step="1" value="0"></label>
+            <button type="button" class="btn icon" id="btn-prev-draw" title="Previous draw (P)" aria-label="Previous draw">‹</button>
+            <button type="button" class="btn icon" id="btn-next-draw" title="Next draw (N)" aria-label="Next draw">›</button>
+            <button type="button" class="btn small" id="btn-random-seed" title="Random seed (R)">Random</button>
+          </fieldset>
+          <fieldset class="control-group" aria-label="View">
+            <div class="segmented" id="axis-buttons" role="radiogroup" aria-label="Slice axis"></div>
+            <label class="slider">Slice <input type="range" id="slice" min="0" max="1000" value="500"><output id="slice-label"></output></label>
+            <label id="channel-wrap" hidden>Image <select id="channel"></select></label>
+          </fieldset>
+          <fieldset class="control-group" aria-label="Display">
+            <label class="slider">Mask <input type="range" id="mask-alpha" min="0" max="100" value="40"></label>
+            <label class="check"><input type="checkbox" id="show-targets" checked> Targets</label>
+            <label class="check"><input type="checkbox" id="show-diff"> Difference</label>
+            <label>Window
+              <select id="window-mode">
+                <option value="input">Shared (input)</option>
+                <option value="auto">Auto per image</option>
+                <option value="manual">Manual</option>
+              </select>
+            </label>
+            <span id="manual-window" hidden>
+              <input type="number" id="window-low" step="any" aria-label="Window low" value="0">
+              <input type="number" id="window-high" step="any" aria-label="Window high" value="1">
+            </span>
+          </fieldset>
+        </div>
+
+        <div class="viewer" id="viewer">
+          <figure class="view">
+            <figcaption><span>Input</span><span class="meta" id="input-meta"></span></figcaption>
+            <div class="canvas-wrap"><canvas id="canvas-input"></canvas></div>
+          </figure>
+          <figure class="view">
+            <figcaption><span>Augmented</span><span class="meta" id="output-meta"></span></figcaption>
+            <div class="canvas-wrap"><canvas id="canvas-output"></canvas><div class="view-error" id="output-error" hidden></div></div>
+          </figure>
+          <figure class="view" id="diff-view" hidden>
+            <figcaption><span>|Augmented − Input|</span></figcaption>
+            <div class="canvas-wrap"><canvas id="canvas-diff"></canvas></div>
+          </figure>
+          <div class="viewer-empty" id="viewer-empty">
+            <p>Load a phantom or your own scan to start previewing.</p>
+            <button type="button" class="btn primary" id="btn-quick-phantom">Load MRI phantom</button>
+          </div>
+          <div class="busy" id="preview-busy" hidden>Rendering…</div>
+        </div>
+        <p class="hint">Scroll to zoom, drag to pan, double-click to reset. ←/→ move slices, N/P change draws.</p>
+
+        <div class="details">
+          <section class="card">
+            <h3>Steps this draw <span class="muted" id="elapsed"></span></h3>
+            <table class="table" id="trace-table"><tbody></tbody></table>
+          </section>
+          <section class="card">
+            <h3>Validation</h3>
+            <ul class="issues" id="issues"></ul>
+          </section>
+          <section class="card">
+            <h3>Output</h3>
+            <dl class="facts" id="output-facts"></dl>
+            <button type="button" class="btn small" id="btn-record">Download replay record</button>
+          </section>
+        </div>
+      </div>
+
+      <div class="tab-page" id="tab-gallery">
+        <div class="controls">
+          <fieldset class="control-group">
+            <label>Draws
+              <select id="gallery-count">
+                <option>6</option><option selected>12</option><option>24</option>
+              </select>
+            </label>
+            <button type="button" class="btn primary" id="btn-gallery">Render gallery</button>
+            <span class="muted">Consecutive draw indices from the current seed, sample ID and epoch. Click a tile to inspect it.</span>
+          </fieldset>
+        </div>
+        <div class="gallery" id="gallery"></div>
+      </div>
+
+      <div class="tab-page" id="tab-stress">
+        <div class="controls">
+          <fieldset class="control-group">
+            <label>Draws <input type="number" id="stress-draws" min="1" value="100"></label>
+            <button type="button" class="btn primary" id="btn-stress">Run stress test</button>
+            <span class="muted">Validates every draw against the original volume.</span>
+          </fieldset>
+        </div>
+        <details class="card" id="validator-card">
+          <summary>Validator settings</summary>
+          <div class="form-grid" id="validator-form"></div>
+        </details>
+        <div id="stress-results"></div>
+      </div>
+
+      <div class="tab-page" id="tab-data">
+        <div class="data-grid">
+          <section class="card">
+            <h3>Synthetic phantom</h3>
+            <div class="form-row">
+              <select id="phantom-select" aria-label="Phantom"></select>
+              <label class="check"><input type="checkbox" id="phantom-demo" checked> Demo labels &amp; targets</label>
+              <button type="button" class="btn primary" id="btn-phantom">Load</button>
+            </div>
+          </section>
+          <section class="card">
+            <h3>Open from disk</h3>
+            <label class="stack">Image (NIfTI, .npy, or DICOM file/folder)
+              <input type="text" id="path-image" placeholder="/data/case01/t1.nii.gz" spellcheck="false"></label>
+            <label class="stack">Mask (optional; NIfTI or .npy)
+              <input type="text" id="path-mask" placeholder="/data/case01/labels.nii.gz" spellcheck="false"></label>
+            <div class="form-row">
+              <label class="check"><input type="checkbox" id="path-resample"> Resample mask to image grid</label>
+              <label class="check"><input type="checkbox" id="path-strict" checked> Strict DICOM</label>
+              <button type="button" class="btn primary" id="btn-path">Open</button>
+            </div>
+          </section>
+          <section class="card">
+            <h3>Upload files</h3>
+            <label class="stack">Image (.nii, .nii.gz, .npy) <input type="file" id="upload-image" accept=".nii,.gz,.npy"></label>
+            <label class="stack">Mask (.nii, .nii.gz, .npy) <input type="file" id="upload-mask" accept=".nii,.gz,.npy"></label>
+            <p class="muted">Files are copied to a private temporary folder on this computer and deleted when the studio stops.</p>
+          </section>
+          <section class="card">
+            <h3>Registered channels</h3>
+            <ul class="chips" id="channel-list"></ul>
+            <div class="form-row">
+              <input type="text" id="channel-name" placeholder="name, e.g. flair" spellcheck="false" aria-label="Channel name">
+              <input type="text" id="channel-path" placeholder="/data/case01/flair.nii.gz" spellcheck="false" aria-label="Channel path">
+              <button type="button" class="btn" id="btn-channel">Add</button>
+            </div>
+            <label class="stack">…or upload <input type="file" id="upload-channel" accept=".nii,.gz,.npy"></label>
+          </section>
+        </div>
+        <section class="card">
+          <h3>Summary</h3>
+          <div id="data-summary" class="muted">Nothing loaded yet.</div>
+        </section>
+      </div>
+    </section>
+
+    <aside class="panel inspector" id="inspector" aria-label="Step inspector"></aside>
+  </main>
+
+  <dialog id="palette" class="modal" aria-label="Add a step">
+    <form method="dialog" class="modal-body">
+      <div class="modal-head">
+        <h2 id="palette-title">Add step</h2>
+        <button class="btn ghost icon" value="cancel" aria-label="Close">×</button>
+      </div>
+      <input type="search" id="palette-search" placeholder="Search transforms…" autocomplete="off" spellcheck="false">
+      <div class="palette-list" id="palette-list"></div>
+    </form>
+  </dialog>
+
+  <dialog id="export-dialog" class="modal wide" aria-label="Export policy">
+    <form method="dialog" class="modal-body">
+      <div class="modal-head">
+        <h2>Export policy</h2>
+        <button class="btn ghost icon" value="cancel" aria-label="Close">×</button>
+      </div>
+      <div class="segmented" id="export-formats" role="radiogroup">
+        <button type="button" data-format="json" class="active">JSON</button>
+        <button type="button" data-format="yaml">YAML</button>
+        <button type="button" data-format="python">Python</button>
+      </div>
+      <textarea id="export-text" readonly spellcheck="false" aria-label="Exported policy"></textarea>
+      <p class="muted" id="export-hint"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="btn-copy">Copy</button>
+        <button type="button" class="btn primary" id="btn-download">Download</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="import-dialog" class="modal wide" aria-label="Import policy">
+    <form method="dialog" class="modal-body">
+      <div class="modal-head">
+        <h2>Import policy</h2>
+        <button class="btn ghost icon" value="cancel" aria-label="Close">×</button>
+      </div>
+      <input type="file" id="import-file" accept=".json,.yaml,.yml">
+      <textarea id="import-text" spellcheck="false" placeholder="Paste a JSON or YAML policy exported by to_json / to_yaml or the studio" aria-label="Policy text"></textarea>
+      <p class="error-text" id="import-error"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn primary" id="btn-import-apply">Import</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <div class="locked" id="locked" hidden>
+    <div class="card">
+      <h2>Studio link required</h2>
+      <p>Open the full address printed in the terminal (it includes <code>?token=…</code>).</p>
+    </div>
+  </div>
+</body>
+</html>
