@@ -87,11 +87,13 @@ training stacks while keeping the default install lightweight.
 | 3.10 | Pipeline inspection for experiment logs and augmentation policy review | `medaugmentx/inspection.py` | ✅ `0.7.0` |
 | 3.11 | Plausibility validation + safe-augmentation guard (`VolumeValidator`, `Guard`) | `medaugmentx/validation.py` | ✅ `0.8.0` |
 | 3.12 | Keypoint & bounding-box targets warped through all spatial transforms | `medaugmentx/core/geometry.py`, `core/volume.py` | ✅ `0.9.0` |
-| 3.13 | Sphinx documentation site | `docs/sphinx/`, `.github/workflows/docs.yml` | ✅ `0.10.0` build; published to GitHub Pages (unreleased) |
-| 3.14 | Jupyter tutorials (MRI, CT, DBT) | `notebooks/`, `medaugmentx/phantoms.py` | ✅ unreleased |
+| 3.13 | Sphinx documentation site | `docs/sphinx/`, `.github/workflows/docs.yml` | ✅ `0.10.0` build; published to GitHub Pages with `1.0.0` |
+| 3.14 | Jupyter tutorials (MRI, CT, DBT) | `notebooks/`, `medaugmentx/phantoms.py` | ✅ `1.0.0` |
 | 3.15 | v1.0 release + GitHub Actions CD pipeline | `.github/` | Prepared for 1.0.0; publication requires maintainer setup |
 | 3.16 | Coherent patient-space affine, units, resampling, and DICOM geometry contracts | `core/`, `io/`, spatial transforms | Implemented in 1.0.0; see release evidence |
 | 3.17 | Actual framework-object integration CI and quantitative modality-model checks | `tests/`, `.github/` | Implemented in 1.0.0; see release evidence |
+| 3.18 | Registered channels (`PerChannel`), millimetre/grid resampling, class-balanced patches, paired policy evaluation | `core/`, spatial transforms, `evaluation.py` | ✅ `1.1.0` |
+| 3.19 | Policy Studio — local app to design, preview and stress-test policies | `medaugmentx/studio/`, `medaugmentx/cli.py` | ✅ `1.1.0` |
 
 ### Acceptance criteria (Phase 3 / v1.0)
 

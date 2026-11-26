@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-11-26
+
 ### Fixed
 
 - Pin CI's Linux runner to Ubuntu 24.04, where setup-python supplies Python

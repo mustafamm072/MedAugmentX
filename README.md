@@ -6,7 +6,7 @@
 [![Docs](https://img.shields.io/badge/docs-medaugmentx-087e8b.svg)](https://mustafamm072.github.io/MedAugmentX/)
 [![Python](https://img.shields.io/badge/python-3.9%20%E2%80%93%203.14-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](docs/MIGRATION_V1.md)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](docs/MIGRATION_V1.md)
 
 MedAugmentX is a purpose-built Python library for data augmentation of medical
 images. Unlike general-purpose libraries (`torchvision`, `albumentations`), it
@@ -138,7 +138,7 @@ Verify the installation:
 
 ```python
 import medaugmentx
-print(medaugmentx.__version__)   # 1.0.0
+print(medaugmentx.__version__)   # 1.1.0
 ```
 
 ---
@@ -683,7 +683,7 @@ experiment records, evaluation reporting, and citation.
 | --- | --- |
 | **1 — Core MVP** | ✅ Core data model, spatial/intensity transforms, DBT, DICOM/NIfTI I/O |
 | **2 — Modality artifacts & serialisation** | ✅ MRI (bias field, ghosting, k-space), CT (beam hardening), presets, JSON/YAML |
-| **3 — Framework interop and v1.0 (CPU)** | Prepared `1.0.0`: coherent patient geometry, real framework tests, replay/worker seeding, model cards, QA preview and release tooling. GPU and clinical/vendor validation remain future work; see [release evidence](docs/RELEASE_READINESS.md). |
+| **3 — Framework interop and v1.0 (CPU)** | `1.0.0`: coherent patient geometry, real framework tests, replay/worker seeding, model cards, QA preview and release tooling. `1.1.0`: the local Policy Studio, registered channels with `PerChannel`, millimetre and grid resampling, class-balanced patches, and paired policy evaluation. GPU and clinical/vendor validation remain future work; see [release evidence](docs/RELEASE_READINESS.md). |
 
 Detailed deliverables: [docs/MILESTONES.md](docs/MILESTONES.md).
 Developer API: the [transform catalog](https://mustafamm072.github.io/MedAugmentX/docs/sphinx/catalog.html)

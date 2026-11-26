@@ -56,3 +56,6 @@ jobs:
           name: distributions
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # A version uploaded earlier with an API token is left as published.
+          skip-existing: true

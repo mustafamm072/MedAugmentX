@@ -203,14 +203,14 @@ outside the source checkout, so editable imports cannot hide packaging errors.
 
 ## Releasing
 
-The version number is recorded in five places and they must agree:
+The package version has a single source, `medaugmentx/_version.py`, which
+`pyproject.toml` reads dynamically. These places must agree with it:
 
 | File | Field |
 | --- | --- |
-| `pyproject.toml` | `project.version` |
-| `medaugmentx/__init__.py` | `__version__` |
+| `medaugmentx/_version.py` | `__version__` (the single source) |
 | `CITATION.cff` | `version`, `date-released` |
-| `README.md` | the `print(medaugmentx.__version__)` comment |
+| `README.md` | the version badge and the `print(medaugmentx.__version__)` comment |
 | `CHANGELOG.md` | the new `## [x.y.z] — YYYY-MM-DD` heading |
 
 The documentation site reads its version from the installed package, and its
