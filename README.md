@@ -378,6 +378,8 @@ loads nothing from the network, so images stay on your machine.
 medaugmentx studio --image t1.nii.gz --mask seg.nii.gz   # or --phantom mri
 ```
 
+![MedAugmentX Policy Studio: policy steps, side-by-side input and augmented MRI with ventricle labels and landmarks, per-step trace, and the parameter inspector](docs/assets/articles/studio-preview.png)
+
 - **Build** policies from presets or a searchable transform palette, with nested
   `Compose`/`OneOf`/`SomeOf`/`Guard`/`PerChannel`, type-aware parameter editing,
   model cards, and undo/redo.
